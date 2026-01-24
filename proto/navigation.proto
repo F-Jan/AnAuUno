@@ -1,0 +1,47 @@
+syntax = "proto2";
+
+message NextTurnDetail
+{
+    enum Side
+    {
+        Left = 0x01;
+        Right = 0x02;
+        Unspecified = 0x03;
+    }
+
+    enum NextEvent
+    {
+        Unknown = 0x00;
+        Departure = 0x01;
+        NameChange = 0x02;
+        SlightTurn = 0x03;
+        Turn = 0x04;
+        SharpTurn = 0x05;
+        UTurn = 0x06;
+        OnRamp = 0x07;
+        OffRamp = 0x08;
+        Forme = 0x09;
+        Merge = 0x0a;
+        RoundaboutEnter = 0x0b;
+        RoundaboutExit = 0x0c;
+        RoundaboutEnterAndExit = 0x0d;
+        Straight = 0x0e;
+        FerryBoat = 0x10;
+        FerryTrain = 0x11;
+        Destination = 0x12;
+    }
+
+    required string road = 1;
+    required Side side = 2;
+    required NextEvent next_turn = 3;
+    optional bytes turngraph = 4;
+    optional uint32 trunnumer = 5;
+    optional uint32 turnangel = 6;
+
+}
+
+message NextTurnDistanceEvent
+{
+    optional uint32 distance = 1;
+    optional uint32 time = 2;
+}

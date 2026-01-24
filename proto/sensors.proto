@@ -1,0 +1,222 @@
+syntax = "proto2";
+
+import "common.proto";
+
+enum SensorType
+{
+    Location = 1;
+    Compass = 2;
+    CarSpeed = 3;
+    RPM = 4;
+    Odometer = 5;
+    FuelLevel = 6;
+    PARKING_BRAKE = 7;
+    Gear = 8;
+    Diagnostics = 9;
+    Night = 10;
+    Environment = 11;
+    HVAC = 12;
+    DrivingStatus = 13;
+    DeadReckoning = 14;
+    Passenger = 15;
+    Door = 16;
+    Light = 17;
+    Tire = 18;
+    Accel = 19;
+    Gyro = 20;
+    GPS = 21;
+}
+
+message SensorBatch
+{
+    message LocationData
+    {
+        required uint64 timestamp = 1;
+        required int32 latitude = 2;
+        required int32 longitude = 3;
+        required uint32 accuracy = 4;
+        optional int32 altitude = 5;
+        optional int32 speed = 6;
+        optional int32 bearing = 7;
+    }
+    message RpmData
+    {
+        required int32 rpm = 1;
+    }
+    message FuelData
+    {
+        required int32 fuel_level = 1;
+        optional int32 range = 2;
+        optional bool low_fuel = 3;
+    }
+    message DeadReckoningData
+    {
+        optional int32 steering_angel = 1;
+        optional int32 wheel_speed = 2;
+    }
+    message NightData
+    {
+        required bool is_night_mode = 1;
+    }
+    message ParkingBrakeData
+    {
+        required bool is_engaged = 1;
+    }
+    message DrivingStatusData
+    {
+        enum Status
+        {
+            Unrestricted = 0;
+            NoVideo = 1; // 0x1
+            NoKeyboardInput = 2; // 0x2
+            NoVoiceInput = 4; // 0x4
+            NoConfig = 8; // 0x8
+            LimitMessageLen = 16; // 0x10
+            FullyRestricted = 31; // 0x1f
+        }
+        required int32 status = 1;
+    }
+    message GpsSatelliteData
+    {
+        message GpsSatellite
+        {
+            optional int32 prn = 1;
+            optional int32 snr_e3 = 2;
+            optional bool used_in_fix = 3;
+            optional int32 azimuth_e3 = 4;
+            optional int32 elevation_e3 = 5;
+        }
+        optional int32 number_in_use = 1;
+        optional int32 number_in_view = 2;
+        repeated GpsSatellite satellites = 3;
+    }
+    message GearData
+    {
+        enum Gear
+        {
+            Neutral = 0; // 0x0
+            First = 1; // 0x1
+            Second = 2; // 0x2
+            Third = 3; // 0x3
+            Fourth = 4; // 0x4
+            Fifth = 5; // 0x5
+            Sixth = 6; // 0x6
+            Eight = 8; // 0x8
+            Seventh = 7; // 0x7
+            Ninth = 9; // 0x9
+            Tenth = 10; // 0xa
+            Drive = 100; // 0x64
+            Park = 101; // 0x65
+            Revers = 102; // 0x66
+        }
+        required Gear gear = 1;
+    }
+    message CompassData
+    {
+        required int32 bearing_e6 =1;
+        required int32 pitch_e6 =2;
+        required int32 roll_e6 =3;
+    }
+    message SpeedData
+    {
+        required int32 speed_e6 =1;
+        optional bool cruise_engaged=2;
+        optional bool cruise_set_speed=3;
+    }
+    message OdometerData
+    {
+        optional int32 kms_el = 1;
+        optional int32 trip_kms_el = 2;
+    }
+    message DiagnosticsData
+    {
+        required bytes diagnostics_byte = 1;
+    }
+    message EnvironmentData
+    {
+        optional int32 temperature_e3 =1;
+        optional int32 pressure_e3 = 2;
+        optional int32 rain = 3;
+    }
+    message HvacData
+    {
+        optional int32 target_temperature_e3 = 1;
+        optional int32 current_temperature_e3 = 2;
+    }
+    message AccelerometerData
+    {
+        optional int32 acceleration_x_e3 = 1;
+        optional int32 acceleration_y_e3 = 2;
+        optional int32 acceleration_z_e3 = 3;
+    }
+    message GyroscopeData
+    {
+        optional int32 rotation_speed_x_e3 = 1;
+        optional int32 rotation_speed_y_e3 = 2;
+        optional int32 rotation_speed_z_e3 = 3;
+    }
+    message DoorData
+    {
+        required bool hood_open=1;
+        required bool boot_open=2;
+        repeated bool door_open=3;
+    }
+    message LightData
+    {
+        enum HeadlightState
+        {
+            Headlight0 = 0;
+            Headlight1 = 1;
+            Headlight2 = 2;
+            Headlight3 = 3;
+        }
+        enum TurnIndicatorState
+        {
+            Indicator0 = 0;
+            Indicator1 = 1;
+            Indicator2 = 2;
+            Indicator3 = 3;
+        }
+        optional HeadlightState headlight = 1;
+        optional TurnIndicatorState turn_indicator = 2;
+        optional bool hazard_light_on = 3;
+    }
+
+    message PassengerData
+    {
+        optional bool passenger_present =1;
+    }
+
+    repeated LocationData location_data = 1; // Working
+    repeated CompassData compass_data = 2; // Sensor not yet supported
+    repeated SpeedData speed_data = 3; // Working - Aka data is received, but has no effect
+    repeated RpmData rpm = 4; //Sensor not yet supported
+    repeated OdometerData odometer_data = 5; //Sensor not yet supported
+    repeated FuelData fuel_data = 6; //Sensor not yet supported
+    repeated ParkingBrakeData parkingbrake_data = 7; // Working
+    repeated GearData gear_data = 8; //Working but need to do the enum definition, and has no effect
+    repeated DiagnosticsData diagnostics_data = 9; //Sensor not yet supported
+    repeated NightData night_mode = 10; // Working
+    repeated EnvironmentData enviorment_data = 11; //Sensor not yet supported
+    repeated HvacData hvac_data = 12; //Sensor not yet supported
+    repeated DrivingStatusData driving_status = 13; //Working
+    repeated DeadReckoningData dead_reckoning = 14; //Sensor not yet supported
+    repeated PassengerData passenger_data = 15; //Sensor not yet supported
+    repeated DoorData door_data= 16; //Sensor not yet supported
+    repeated LightData light_data= 17;  //Sensor not yet supported
+    //repeated TirePressureData Tire = 18;
+    repeated AccelerometerData accel_data = 19; //Sensor not yet supported
+    repeated GyroscopeData gyro_data = 20; //Sensor not yet supported
+    repeated GpsSatelliteData gps_satellite_data = 21;
+}
+
+message SensorRequest
+{
+    required SensorType type = 1;
+    required int64 min_update_period = 2;
+}
+
+message SensorResponse
+{
+    required MessageStatus status = 1;
+}

@@ -1,0 +1,14 @@
+[package]
+name = "aaplib"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+rusb = "0.9"
+openssl = "0.10.75"
+protobuf = "3.7.2"
+hex = "0.4.3"
+
+[build-dependencies]
+protobuf-codegen = "3.7.2"
