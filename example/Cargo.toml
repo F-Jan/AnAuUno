@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-aaplib= { path = ".." }
+anauuno= { path = ".." }
 rusb = "0.9"
 gstreamer = "0.24.4"
 gstreamer-app = "0.24.4"
