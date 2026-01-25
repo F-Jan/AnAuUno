@@ -1,5 +1,5 @@
-use aaplib::connection::AapConnection;
-use aaplib::stream::UsbAapStream;
+use anauuno::connection::AapConnection;
+use anauuno::stream::UsbAapStream;
 use gstreamer::prelude::*;
 use gstreamer_app::AppSrc;
 use rusb::{Context, Device, DeviceHandle, Hotplug, HotplugBuilder, UsbContext};
