@@ -122,7 +122,7 @@ impl<S: AapSteam> AapConnection<S> {
     }
 
     pub fn write_unencrypted_message(&mut self, message: Message) {
-        self.get_stream_mut().write_unencrypted_message(message)
+        message.write_unencrypted(self.get_stream_mut()).unwrap()
     }
 
     pub fn read_message(&mut self) -> Option<Message> {

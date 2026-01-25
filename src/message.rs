@@ -1,3 +1,6 @@
+use std::io::{Read, Write};
+use crate::stream::AapSteam;
+
 pub struct Message {
     pub channel: u8,
     pub flags: u8,
@@ -126,13 +129,60 @@ pub enum NavigationMessageType {
     NextTurnDistanceAndTime = 0x8005,
 }
 
-impl NavigationMessageType {
-    pub fn from_u16(value: u16) -> Option<Self> {
-        match value {
-             0x8004 => Some(NavigationMessageType::NextTurnDetails),
-             0x8005 => Some(NavigationMessageType::NextTurnDistanceAndTime),
-            _ => None,
+impl Message {
+    pub fn read_unencrypted<S: AapSteam>(stream: &mut S) -> std::io::Result<Self> {
+        let mut buf = vec![0u8; 6];
+        loop {
+            let read_size = stream.read_raw(&mut buf)?;
+
+            if read_size > 0 {
+                break;
+            }
         }
+
+        let channel = buf[0];
+        let flags = buf[1];
+        let length = u16::from_be_bytes([buf[2], buf[3]]);
+        let msg_type = u16::from_be_bytes([buf[4], buf[5]]);
+
+        let mut buf = vec![0u8; (length - 2) as usize];
+        loop {
+            let read_size = stream.read_raw(&mut buf)?;
+
+            if read_size > 0 {
+                break;
+            }
+        }
+
+        Ok(Message {
+            channel,
+            flags,
+            length,
+            msg_type,
+            data: buf,
+        })
+    }
+
+    pub fn write_unencrypted<S: AapSteam>(&self, stream: &mut S) -> std::io::Result<()> {
+        let length = (self.data.len() + 2) as u16;
+        let total_length = length + 1 + 1 + 4; // TODO: Why + 4?
+
+        let mut buf = Vec::with_capacity(total_length as usize);
+
+        buf.push(self.channel);
+        buf.push(self.flags);
+
+        buf.push((length >> 8) as u8);
+        buf.push((length & 0xFF) as u8);
+
+        buf.push(((self.msg_type >> 8) & 0xFF) as u8);
+        buf.push((self.msg_type & 0xFF) as u8);
+
+        buf.extend_from_slice(&self.data);
+
+        stream.write_raw(&mut buf);
+
+        Ok(())
     }
 }
 

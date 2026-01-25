@@ -9,9 +9,6 @@ pub trait AapSteam: Read + Write {
     fn read_raw(&mut self, buf: &mut [u8]) -> std::io::Result<usize>;
     fn write_raw(&mut self, buf: &mut [u8]);
 
-    fn read_unencrypted_message(&mut self) -> Message;
-    fn write_unencrypted_message(&mut self, message: Message);
-
     fn extract_write_buffer(&mut self) -> Vec<u8>;
 }
 
@@ -95,7 +92,7 @@ impl Read for UsbAapStream {
                 }
             }
         } else {
-            let message = self.read_unencrypted_message();
+            let message = Message::read_unencrypted(self).unwrap();
             usb_buf = message.data;
         }
 
@@ -132,7 +129,7 @@ impl Write for UsbAapStream {
                 data: self.write_buffer.to_vec(),
             };
 
-            self.write_unencrypted_message(message);
+            message.write_unencrypted(self)?;
 
             self.write_buffer.clear();
 
@@ -167,59 +164,6 @@ impl AapSteam for UsbAapStream {
         self.device_handle
             .write_bulk(self.endpoint_out, buf, std::time::Duration::from_secs(1))
             .unwrap();
-    }
-
-    fn read_unencrypted_message(&mut self) -> Message {
-        let mut buf = vec![0u8; 6];
-        loop {
-            let read_size = self.read_raw(&mut buf).unwrap();
-
-            if read_size > 0 {
-                break;
-            }
-        }
-
-        let channel = buf[0];
-        let flags = buf[1];
-        let length = u16::from_be_bytes([buf[2], buf[3]]);
-        let msg_type = u16::from_be_bytes([buf[4], buf[5]]);
-
-        let mut buf = vec![0u8; (length - 2) as usize];
-        loop {
-            let read_size = self.read_raw(&mut buf).unwrap();
-
-            if read_size > 0 {
-                break;
-            }
-        }
-
-        Message {
-            channel,
-            flags,
-            length,
-            msg_type,
-            data: buf,
-        }
-    }
-
-    fn write_unencrypted_message(&mut self, message: Message) {
-        let length = (message.data.len() + 2) as u16;
-        let total_length = length + 1 + 1 + 4; // TODO: Why + 4?
-
-        let mut buf = Vec::with_capacity(total_length as usize);
-
-        buf.push(message.channel);
-        buf.push(message.flags);
-
-        buf.push((length >> 8) as u8);
-        buf.push((length & 0xFF) as u8);
-
-        buf.push(((message.msg_type >> 8) & 0xFF) as u8);
-        buf.push((message.msg_type & 0xFF) as u8);
-
-        buf.extend_from_slice(&message.data);
-
-        self.write_raw(&mut buf);
     }
 
     fn extract_write_buffer(&mut self) -> Vec<u8> {
