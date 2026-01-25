@@ -8,7 +8,7 @@ use crate::channel::microphone::MicrophoneChannel;
 use crate::channel::sensor::SensorChannel;
 use crate::channel::video::VideoChannel;
 use crate::channel::Channel;
-use crate::message::{FrameHeaderType, Message, ControlMessageType};
+use crate::message::{Message, ControlMessageType};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::stream::AapSteam;
@@ -19,6 +19,7 @@ use protobuf::{CodedOutputStream, Message as ProtobufMessage};
 use std::io::{Read, Write};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::{mpsc, Arc, Mutex};
+use crate::frame::{FrameHeader, FrameType};
 
 // Compile-time embedded PEM files (place these paths in your crate, e.g. `certs/`)
 static CERT_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/cert2.pem"));
@@ -91,7 +92,7 @@ impl<S: AapSteam> AapConnection<S> {
         // Version-Request
         self.write_unencrypted_message(Message {
             channel: 0,
-            flags: 3,
+            is_control: false,
             length: 0,
             msg_type: ControlMessageType::VersionRequest as u16,
             data: vec![0u8, 1u8, 0u8, 7u8],
@@ -110,7 +111,7 @@ impl<S: AapSteam> AapConnection<S> {
         // Handshake-OK
         self.write_unencrypted_message(Message {
             channel: 0,
-            flags: 3,
+            is_control: false,
             length: 0,
             msg_type: ControlMessageType::HandshakeOk as u16,
             data: vec![8u8, 0u8],
@@ -133,25 +134,14 @@ impl<S: AapSteam> AapConnection<S> {
             return None;
         }
 
-        let channel = buf[0];
-        let flags = buf[1];
-        let length = u16::from_be_bytes([buf[2], buf[3]]);
-        
-        let frame_type_mask = 0b0011;
-        let frame_type = flags & frame_type_mask;
-        let frame_type = FrameHeaderType::from_u8(frame_type).unwrap(); // TODO: Error handling
+        let frame_header = FrameHeader::from_bytes(&buf);
+        let channel = frame_header.channel;
+        let frame_type = frame_header.frame_type;
+        let encrypted = frame_header.encrypted;
+        let length = frame_header.length;
+        let is_control = frame_header.is_control_message;
 
-        let message_type_mask = 0b0100;
-        let message_type = flags & message_type_mask;
-        let message_type = message_type >> 2;
-        let is_control_message = message_type == 1;
-
-        let encryption_type_mask = 0b1000;
-        let encryption_type = flags & encryption_type_mask;
-        let encryption_type = encryption_type >> 3;
-        let encrypted = encryption_type == 1;
-
-        if frame_type == FrameHeaderType::First {
+        if frame_type == FrameType::First {
             let mut buf = vec![0u8; 4];
 
             loop {
@@ -187,7 +177,7 @@ impl<S: AapSteam> AapConnection<S> {
         let mut data;
         let msg_type;
 
-        if frame_type == FrameHeaderType::Single || frame_type == FrameHeaderType::First {
+        if frame_type == FrameType::Single || frame_type == FrameType::First {
             msg_type = u16::from_be_bytes([buf[0], buf[1]]);
             data = buf[2..].to_vec();
         } else {
@@ -196,7 +186,7 @@ impl<S: AapSteam> AapConnection<S> {
         }
 
         // Read next Frame
-        if frame_type == FrameHeaderType::First || frame_type == FrameHeaderType::Middle {
+        if frame_type == FrameType::First || frame_type == FrameType::Middle {
             let next_data;
             loop {
                 let next_frame = self.read_message();
@@ -211,7 +201,7 @@ impl<S: AapSteam> AapConnection<S> {
         
         Some(Message{
             channel,
-            flags,
+            is_control,
             length: data.len() as u16,
             msg_type,
             data,
@@ -231,13 +221,19 @@ impl<S: AapSteam> AapConnection<S> {
 
         let mut buf = Vec::with_capacity(data.len() + 4);
 
-        buf.push(message.channel);
-        buf.push(message.flags);
-
         let length = data.len() as u16;
-        buf.push((length >> 8) as u8);
-        buf.push((length & 0xFF) as u8);
 
+        let frame_header = FrameHeader {
+            channel: message.channel,
+            length,
+            frame_type: FrameType::Single,
+            encrypted: true,
+            is_control_message: message.is_control,
+        };
+
+        let frame_header_bytes = frame_header.to_bytes();
+
+        buf.extend_from_slice(&frame_header_bytes);
         buf.extend_from_slice(&data);
 
         self.get_stream_mut().write_raw(&mut buf);
@@ -326,7 +322,7 @@ impl<S: AapSteam> AapConnection<S> {
 
         Message {
             channel: message.channel,
-            flags: 15,
+            is_control: true,
             length: data.len() as u16,
             msg_type: ControlMessageType::ChannelOpenResponse as u16,
             data: data.to_vec(),

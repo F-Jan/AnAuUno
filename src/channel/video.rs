@@ -57,7 +57,7 @@ impl VideoChannel {
 
             sender.lock().unwrap().send(Message {
                 channel: message.channel,
-                flags: 0x0b,
+                is_control: false,
                 length: 0,
                 msg_type: MediaMessageType::ConfigResponse as u16,
                 data,
@@ -77,7 +77,7 @@ impl VideoChannel {
 
             sender.lock().unwrap().send(Message {
                 channel: message.channel,
-                flags: 0x0b,
+                is_control: false,
                 length: 0,
                 msg_type: MediaMessageType::VideoFocusNotification as u16,
                 data,
@@ -100,7 +100,7 @@ impl VideoChannel {
 
         Message {
             channel: message.channel,
-            flags: 0x0b,
+            is_control: false,
             length: 0,
             msg_type: MediaMessageType::VideoFocusNotification as u16,
             data,
@@ -129,7 +129,7 @@ impl VideoChannel {
         
         let message = Message{
             channel: 2,
-            flags: 11,
+            is_control: false,
             length: 0,
             msg_type: MediaMessageType::Ack as u16,
             data,
@@ -192,7 +192,7 @@ impl Channel<VideoChannelData> for VideoChannel {
                 //data.buffer_sender.send(message.data.to_vec()).unwrap();
             }
             Message { .. } => {
-                println!("Unsupported VideoChannel: {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+                println!("Unsupported VideoChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
     }

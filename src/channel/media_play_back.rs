@@ -52,7 +52,7 @@ impl Channel<MediaPlayBackChannelData> for MediaPlayBackChannel {
                 //println!("MediaStartRequest MEDIA_PLAYBACK_METADATA: {:?}", req)
             }
             Message { .. } => {
-                println!("Unsupported MediaPlayBackChannel: {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+                println!("Unsupported MediaPlayBackChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
     }

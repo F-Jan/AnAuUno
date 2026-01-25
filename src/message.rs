@@ -1,9 +1,9 @@
-use std::io::{Read, Write};
+use crate::frame::{FrameHeader, FrameType};
 use crate::stream::AapSteam;
 
 pub struct Message {
     pub channel: u8,
-    pub flags: u8,
+    pub is_control: bool,
     pub length: u16,
     pub msg_type: u16,
     pub data: Vec<u8>,
@@ -140,9 +140,11 @@ impl Message {
             }
         }
 
-        let channel = buf[0];
-        let flags = buf[1];
-        let length = u16::from_be_bytes([buf[2], buf[3]]);
+        let frame_header = FrameHeader::from_bytes(&buf);
+        let channel = frame_header.channel;
+        let length = frame_header.length;
+        let is_control = frame_header.is_control_message;
+
         let msg_type = u16::from_be_bytes([buf[4], buf[5]]);
 
         let mut buf = vec![0u8; (length - 2) as usize];
@@ -156,7 +158,7 @@ impl Message {
 
         Ok(Message {
             channel,
-            flags,
+            is_control,
             length,
             msg_type,
             data: buf,
@@ -169,11 +171,17 @@ impl Message {
 
         let mut buf = Vec::with_capacity(total_length as usize);
 
-        buf.push(self.channel);
-        buf.push(self.flags);
+        let frame_header = FrameHeader {
+            channel: self.channel,
+            length,
+            frame_type: FrameType::Single,
+            encrypted: false,
+            is_control_message: self.is_control,
+        };
 
-        buf.push((length >> 8) as u8);
-        buf.push((length & 0xFF) as u8);
+        let frame_header_bytes = frame_header.to_bytes();
+        
+        buf.extend_from_slice(&frame_header_bytes);
 
         buf.push(((self.msg_type >> 8) & 0xFF) as u8);
         buf.push((self.msg_type & 0xFF) as u8);
@@ -215,26 +223,6 @@ impl SensorsMessageType {
              0x8001 => Some(SensorsMessageType::StartRequest),
              0x8002 => Some(SensorsMessageType::StartResponse),
              0x8003 => Some(SensorsMessageType::Event),
-            _ => None,
-        }
-    }
-}
-
-#[derive(PartialEq, Debug)]
-pub enum FrameHeaderType {
-    Middle = 0,
-    First = 1,
-    Last = 2,
-    Single = 3,
-}
-
-impl FrameHeaderType {
-    pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(FrameHeaderType::Middle),
-            1 => Some(FrameHeaderType::First),
-            2 => Some(FrameHeaderType::Last),
-            3 => Some(FrameHeaderType::Single),
             _ => None,
         }
     }

@@ -43,7 +43,7 @@ impl InputChannel {
 
         Message {
             channel: message.channel,
-            flags: 0x0b,
+            is_control: false,
             length: 0,
             msg_type: InputMessageType::BindingResponse as u16,
             data,
@@ -68,7 +68,7 @@ impl InputChannel {
 
         self.get_out_sender().lock().unwrap().send(Message {
             channel: 3, // Input Channel
-            flags: 0x0b,
+            is_control: false,
             length: 0,
             msg_type: InputMessageType::Event as u16,
             data,
@@ -79,12 +79,12 @@ impl InputChannel {
 impl Channel<InputChannelData> for InputChannel {
     fn handle_message(message: Message, sender: Arc<Mutex<Sender<Message>>>, data: Arc<Mutex<InputChannelData>>) {
         match message {
-            Message { flags: 11, msg_type: 32770, .. } => { // BindingRequest
+            Message { is_control: false, msg_type: 32770, .. } => { // BindingRequest
                 let return_msg = Self::handle_binding_request(message);
                 sender.lock().unwrap().send(return_msg).unwrap();
             }
             Message { .. } => {
-                println!("Unsupported InputChannel: {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+                println!("Unsupported InputChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
     }

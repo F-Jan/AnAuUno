@@ -27,7 +27,7 @@ impl MicrophoneChannel {
 
 impl Channel<MicrophoneChannelData> for MicrophoneChannel {
     fn handle_message(message: Message, sender: Arc<Mutex<Sender<Message>>>, data: Arc<Mutex<MicrophoneChannelData>>) {
-        println!("Unsupported MicrophoneChannel: {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+        println!("Unsupported MicrophoneChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
     }
 
     fn send_message(&mut self, message: Message) {

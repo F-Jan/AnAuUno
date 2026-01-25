@@ -123,7 +123,7 @@ impl Write for UsbAapStream {
         } else {
             let message = Message {
                 channel: 0,
-                flags: 3,
+                is_control: false,
                 length: 0,
                 msg_type: 3,
                 data: self.write_buffer.to_vec(),

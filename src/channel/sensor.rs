@@ -45,7 +45,7 @@ impl SensorChannel {
 
         sender.lock().unwrap().send(Message {
             channel: message.channel,
-            flags: 0x0b,
+            is_control: false,
             length: 0,
             msg_type: SensorsMessageType::StartResponse as u16,
             data,
@@ -65,7 +65,7 @@ impl SensorChannel {
 
         sender.lock().unwrap().send(Message {
             channel: message.channel,
-            flags: 0x0b,
+            is_control: false,
             length: 0,
             msg_type: SensorsMessageType::Event as u16,
             data,
@@ -76,11 +76,11 @@ impl SensorChannel {
 impl Channel<SensorChannelData> for SensorChannel {
     fn handle_message(message: Message, sender: Arc<Mutex<Sender<Message>>>, data: Arc<Mutex<SensorChannelData>>) {
         match message {
-            Message { flags: 11, msg_type: 32769, .. } => { // SensorStartRequest
+            Message { is_control: false, msg_type: 32769, .. } => { // SensorStartRequest
                 let return_msg = Self::handle_sensor_start_request(message, Arc::clone(&sender));
             }
             Message { .. } => {
-                println!("Unsupported SensorChannel: {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+                println!("Unsupported SensorChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
     }

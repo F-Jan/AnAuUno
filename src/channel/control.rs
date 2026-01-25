@@ -65,7 +65,7 @@ impl ControlChannel {
 
         Message {
             channel: 0,
-            flags: 11,
+            is_control: false,
             length: data.len() as u16,
             msg_type: ControlMessageType::AudioFocusNotification as u16,
             data: data.to_vec(),
@@ -240,7 +240,7 @@ impl ControlChannel {
 
         Message {
             channel: 0,
-            flags: 11,
+            is_control: false,
             length: data.len() as u16,
             msg_type: ControlMessageType::ServiceDiscoveryResponse as u16,
             data: data.to_vec(),
@@ -263,11 +263,11 @@ impl Channel<ControlChannelData> for ControlChannel {
                     sender.lock().unwrap().send(return_msg).unwrap();
                 }
                 _ => {
-                    println!("Unsupported Control: {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+                    println!("Unsupported Control: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
                 }
             }
         } else {
-            println!("Unsupported : {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+            println!("Unsupported : {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
         }
     }
 

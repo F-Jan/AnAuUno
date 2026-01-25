@@ -46,7 +46,7 @@ impl Audio2Channel {
 
             return Some(Message {
                 channel: message.channel,
-                flags: 0x0b,
+                is_control: false,
                 length: 0,
                 msg_type: MediaMessageType::ConfigResponse as u16,
                 data,
@@ -60,7 +60,7 @@ impl Audio2Channel {
 impl Channel<Audio2ChannelData> for Audio2Channel {
     fn handle_message(message: Message, sender: Arc<Mutex<Sender<Message>>>, data: Arc<Mutex<Audio2ChannelData>>) {
         match message {
-            Message { flags: 11, msg_type: 32768, .. } => { // SetupRequest
+            Message { is_control: false, msg_type: 32768, .. } => { // SetupRequest
                 let return_msg = Self::handle_media_setup_request(message);
 
                 if let Some(return_msg) = return_msg {
@@ -68,7 +68,7 @@ impl Channel<Audio2ChannelData> for Audio2Channel {
                 }
             }
             Message { .. } => {
-                println!("Unsupported Audio2Channel: {} {} {} {} {}", message.channel, message.flags, message.length, message.msg_type, hex::encode(&message.data));
+                println!("Unsupported Audio2Channel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
     }
