@@ -193,11 +193,11 @@ message SensorBatch
     repeated RpmData rpm = 4; //Sensor not yet supported
     repeated OdometerData odometer_data = 5; //Sensor not yet supported
     repeated FuelData fuel_data = 6; //Sensor not yet supported
-    repeated ParkingBrakeData parkingbrake_data = 7; // Working
+    repeated ParkingBrakeData parking_brake_data = 7; // Working
     repeated GearData gear_data = 8; //Working but need to do the enum definition, and has no effect
     repeated DiagnosticsData diagnostics_data = 9; //Sensor not yet supported
     repeated NightData night_mode = 10; // Working
-    repeated EnvironmentData enviorment_data = 11; //Sensor not yet supported
+    repeated EnvironmentData environment_data = 11; //Sensor not yet supported
     repeated HvacData hvac_data = 12; //Sensor not yet supported
     repeated DrivingStatusData driving_status = 13; //Working
     repeated DeadReckoningData dead_reckoning = 14; //Sensor not yet supported

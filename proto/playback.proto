@@ -22,7 +22,7 @@ message MediaMetaData
     optional string song = 1;
     optional string artist = 2;
     optional string album = 3;
-    optional bytes albumart = 4;
+    optional bytes album_art = 4;
     optional string playlist = 5;
     optional uint32 duration = 6;
     optional uint32 rating = 7;
