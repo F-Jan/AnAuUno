@@ -1,4 +1,3 @@
-use std::io::Write;
 use crate::channel::audio::AudioChannel;
 use crate::channel::audio1::Audio1Channel;
 use crate::channel::audio2::Audio2Channel;
@@ -13,7 +12,7 @@ use crate::message::{Message, ControlMessageType};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::stream::AapSteam;
-use openssl::ssl::{Ssl, SslConnector, SslMethod, SslStream, SslVerifyMode};
+use openssl::ssl::{Ssl, SslConnector, SslContext, SslMethod, SslStream, SslVerifyMode};
 use openssl::x509::X509;
 use openssl::pkey::PKey;
 use protobuf::{CodedOutputStream, Message as ProtobufMessage};
@@ -88,18 +87,18 @@ impl<S: AapSteam> AapConnection<S> {
 
     pub fn start(&mut self) {
         // Version-Request
-        self.write_unencrypted_message(Message {
+        self.write_message(Message {
             channel: 0,
             is_control: false,
             length: 0,
             msg_type: ControlMessageType::VersionRequest as u16,
             data: vec![0u8, 1u8, 0u8, 7u8],
-        });
+        }, false).unwrap();
 
         // Version-Response
         let mut version_message = None;
         while version_message.is_none() {
-            version_message = self.read_message();
+            version_message = self.read_message().unwrap();
         }
         //println!("{}", hex::encode(version_message.data));
 
@@ -107,29 +106,25 @@ impl<S: AapSteam> AapConnection<S> {
         self.tls_stream.do_handshake().unwrap();
 
         // Handshake-OK
-        self.write_unencrypted_message(Message {
+        self.write_message(Message {
             channel: 0,
             is_control: false,
             length: 0,
             msg_type: ControlMessageType::HandshakeOk as u16,
             data: vec![8u8, 0u8],
-        });
+        }, false).unwrap();
 
         self.tls_stream.get_mut().finish_handshake();
 
         self.start_loop();
     }
 
-    pub fn read_message(&mut self) -> Option<Message> {
-        Message::try_read(&mut self.tls_stream).unwrap()
+    pub fn read_message(&mut self) -> crate::error::Result<Option<Message>> {
+        Message::try_read(&mut self.tls_stream)
     }
 
-    pub fn write_unencrypted_message(&mut self, message: Message) {
-        message.write(&mut self.tls_stream, false).unwrap()
-    }
-
-    pub fn write_encrypted_message(&mut self, message: Message) {
-        message.write(&mut self.tls_stream, true).unwrap()
+    pub fn write_message(&mut self, message: Message, encrypted: bool) -> crate::error::Result<()> {
+        message.write(&mut self.tls_stream, encrypted)
     }
 
     fn start_loop(&mut self) {
@@ -142,7 +137,7 @@ impl<S: AapSteam> AapConnection<S> {
 
             match channel_message {
                 Ok(msg) => {
-                    self.write_encrypted_message(msg);
+                    self.write_message(msg, true).unwrap();
                 }
                 Err(TryRecvError::Empty) => {}
                 Err(TryRecvError::Disconnected) => {
@@ -152,7 +147,7 @@ impl<S: AapSteam> AapConnection<S> {
 
 
             // Receive
-            let message = self.read_message();
+            let message = self.read_message().unwrap();
 
             if let Some(message) = message {
                 if message.msg_type == ControlMessageType::ChannelOpenRequest as u16 {
@@ -171,7 +166,7 @@ impl<S: AapSteam> AapConnection<S> {
                     }
 
                     let return_msg = self.handle_channel_open_request(message);
-                    self.write_encrypted_message(return_msg);
+                    self.write_message(return_msg, true);
                 } else {
                     match message.channel {
                         0 => self.control_channel.send_message(message),

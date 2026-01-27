@@ -6,8 +6,8 @@ use std::io::{Read, Write};
 pub trait AapSteam: Read + Write {
     fn finish_handshake(&mut self);
 
-    fn read_raw(&mut self, buf: &mut [u8]) -> std::io::Result<usize>;
-    fn write_raw(&mut self, buf: &mut [u8]);
+    fn read_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<usize>;
+    fn write_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<()>;
 
     fn extract_write_buffer(&mut self) -> Vec<u8>;
 }
@@ -143,7 +143,7 @@ impl AapSteam for UsbAapStream {
         self.handshake_done = true;
     }
 
-    fn read_raw(&mut self, buf: &mut [u8]) -> std::io::Result<usize> { 
+    fn read_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<usize> { 
         self.fill_in_buffer(buf.len());
 
         if self.raw_buffer_in.len() == 0 {
@@ -160,10 +160,11 @@ impl AapSteam for UsbAapStream {
         Ok(bytes_read)
     }
 
-    fn write_raw(&mut self, buf: &mut [u8]) {
+    fn write_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<()> {
         self.device_handle
-            .write_bulk(self.endpoint_out, buf, std::time::Duration::from_secs(1))
-            .unwrap();
+            .write_bulk(self.endpoint_out, buf, std::time::Duration::from_secs(1))?;
+
+        Ok(())
     }
 
     fn extract_write_buffer(&mut self) -> Vec<u8> {

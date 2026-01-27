@@ -132,7 +132,7 @@ pub enum NavigationMessageType {
 }
 
 impl Message {
-    pub fn read_unencrypted<S: AapSteam>(stream: &mut S) -> std::io::Result<Self> {
+    pub fn read_unencrypted<S: AapSteam>(stream: &mut S) -> crate::error::Result<Self> {
         let mut buf = vec![0u8; 6];
         loop {
             let read_size = stream.read_raw(&mut buf)?;
@@ -167,7 +167,7 @@ impl Message {
         })
     }
 
-    pub fn write_unencrypted<S: AapSteam>(&self, stream: &mut S) -> std::io::Result<()> {
+    pub fn write_unencrypted<S: AapSteam>(&self, stream: &mut S) -> crate::error::Result<()> {
         let length = (self.data.len() + 2) as u16;
         let total_length = length + 4;
 
@@ -190,12 +190,12 @@ impl Message {
 
         buf.extend_from_slice(&self.data);
 
-        stream.write_raw(&mut buf);
+        stream.write_raw(&mut buf)?;
 
         Ok(())
     }
 
-    pub fn try_read<S: AapSteam>(stream: &mut SslStream<S>) -> std::io::Result<Option<Self>> {
+    pub fn try_read<S: AapSteam>(stream: &mut SslStream<S>) -> crate::error::Result<Option<Self>> {
         let mut buf = vec![0u8; 4];
         let read_size = stream.get_mut().read_raw(&mut buf)?;
 
@@ -277,7 +277,7 @@ impl Message {
         }))
     }
 
-    pub fn write<S: AapSteam>(&self, stream: &mut SslStream<S>, encrypted: bool) -> std::io::Result<()> {
+    pub fn write<S: AapSteam>(&self, stream: &mut SslStream<S>, encrypted: bool) -> crate::error::Result<()> {
         let mut data = Vec::with_capacity(self.length as usize + 2);
 
         data.push(((self.msg_type >> 8) & 0xFF) as u8);
@@ -307,7 +307,7 @@ impl Message {
         buf.extend_from_slice(&frame_header_bytes);
         buf.extend_from_slice(&data);
 
-        stream.get_mut().write_raw(&mut buf);
+        stream.get_mut().write_raw(&mut buf)?;
 
         Ok(())
     }
