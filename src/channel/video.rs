@@ -9,8 +9,6 @@ use std::sync::{mpsc, Arc, Mutex};
 
 pub struct VideoChannelData {
     pub session_id: Option<i32>,
-    //pub open_options_file: File,
-    pub counter: u32,
     pub buffer_sender: Sender<Vec<u8>>,
     pub infos: Vec<u8>,
 }
@@ -32,7 +30,6 @@ impl VideoChannel {
             out_sender,
             data: Arc::new(Mutex::new(VideoChannelData {
                 session_id: None,
-                counter: 0,
                 buffer_sender,
                 infos: vec![],
             })),
@@ -154,7 +151,7 @@ impl Channel<VideoChannelData> for VideoChannel {
                 Self::handle_media_start_request(message, Arc::clone(&data));
             }
             Message { msg_type: 0, .. } => { // Data
-                let mut data = data.lock().unwrap();
+                let data = data.lock().unwrap();
                 
                 let session_id = data.session_id;
                 match session_id {
@@ -164,17 +161,10 @@ impl Channel<VideoChannelData> for VideoChannel {
                     None => todo!()
                 }
                 
-                //println!("Data {}", data.counter);
-                //println!("Data {}", hex::encode(&message.data[8..min(message.data.len(), 50)]));
-                
                 let mut buffer = data.infos.clone();
                 buffer.append(&mut message.data[8..].to_vec());
 
-                //println!("Data {}", hex::encode(&buffer));
-
-                //data.buffer_sender.send(message.data[8..].to_vec()).unwrap();
                 data.buffer_sender.send(buffer).unwrap();
-                data.counter += 1;
             }
             Message { msg_type: 1, .. } => { // Codec Config
                 let mut data = data.lock().unwrap();

@@ -21,7 +21,6 @@ use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::{mpsc, Arc, Mutex};
 use crate::frame::{FrameHeader, FrameType};
 
-// Compile-time embedded PEM files (place these paths in your crate, e.g. `certs/`)
 static CERT_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/cert2.pem"));
 static KEY_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/private2.pem"));
 
