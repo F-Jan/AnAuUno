@@ -1,3 +1,4 @@
+use std::io::Write;
 use crate::channel::audio::AudioChannel;
 use crate::channel::audio1::Audio1Channel;
 use crate::channel::audio2::Audio2Channel;
@@ -16,10 +17,8 @@ use openssl::ssl::{Ssl, SslConnector, SslMethod, SslStream, SslVerifyMode};
 use openssl::x509::X509;
 use openssl::pkey::PKey;
 use protobuf::{CodedOutputStream, Message as ProtobufMessage};
-use std::io::{Read, Write};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::{mpsc, Arc, Mutex};
-use crate::frame::{FrameHeader, FrameType};
 
 static CERT_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/cert2.pem"));
 static KEY_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/private2.pem"));
@@ -116,130 +115,21 @@ impl<S: AapSteam> AapConnection<S> {
             data: vec![8u8, 0u8],
         });
 
-        self.get_stream_mut().finish_handshake();
+        self.tls_stream.get_mut().finish_handshake();
 
         self.start_loop();
     }
 
-    pub fn write_unencrypted_message(&mut self, message: Message) {
-        message.write_unencrypted(self.get_stream_mut()).unwrap()
+    pub fn read_message(&mut self) -> Option<Message> {
+        Message::try_read(&mut self.tls_stream).unwrap()
     }
 
-    pub fn read_message(&mut self) -> Option<Message> {
-        let mut buf = vec![0u8; 4];
-        let read_size = self.get_stream_mut().read_raw(&mut buf).unwrap();
-
-        if read_size == 0 {
-            return None;
-        }
-
-        let frame_header = FrameHeader::from_bytes(&buf);
-        let channel = frame_header.channel;
-        let frame_type = frame_header.frame_type;
-        let encrypted = frame_header.encrypted;
-        let length = frame_header.length;
-        let is_control = frame_header.is_control_message;
-
-        if frame_type == FrameType::First {
-            let mut buf = vec![0u8; 4];
-
-            loop {
-                let read_size = self.get_stream_mut().read_raw(&mut buf).unwrap();
-
-                if read_size > 0 {
-                    break;
-                }
-            }
-
-            // TODO
-        }
-
-        let mut buf;
-        loop {
-            let read_size = if encrypted {
-                buf = vec![0u8; 131080];
-                let ret = self.tls_stream.read(&mut buf).unwrap();
-                buf = buf[..ret].to_vec();
-
-                ret
-            } else {
-                buf = vec![0u8; length as usize];
-
-                self.get_stream_mut().read_raw(&mut buf).unwrap()
-            };
-
-            if read_size > 0 || length == 0 {
-                break;
-            }
-        }
-
-        let mut data;
-        let msg_type;
-
-        if frame_type == FrameType::Single || frame_type == FrameType::First {
-            msg_type = u16::from_be_bytes([buf[0], buf[1]]);
-            data = buf[2..].to_vec();
-        } else {
-            msg_type = 0;
-            data = buf.to_vec();
-        }
-
-        // Read next Frame
-        if frame_type == FrameType::First || frame_type == FrameType::Middle {
-            let next_data;
-            loop {
-                let next_frame = self.read_message();
-                if let Some(next_frame) = next_frame {
-                    next_data = next_frame.data;
-                    break;
-                }
-            }
-
-            data.extend_from_slice(&next_data);
-        }
-        
-        Some(Message{
-            channel,
-            is_control,
-            length: data.len() as u16,
-            msg_type,
-            data,
-        })
+    pub fn write_unencrypted_message(&mut self, message: Message) {
+        message.write(&mut self.tls_stream, false).unwrap()
     }
 
     pub fn write_encrypted_message(&mut self, message: Message) {
-        let mut data = Vec::with_capacity(message.length as usize + 2);
-
-        data.push(((message.msg_type >> 8) & 0xFF) as u8);
-        data.push((message.msg_type & 0xFF) as u8);
-
-        data.extend_from_slice(&message.data);
-
-        let _ret = self.tls_stream.write(&mut data).unwrap();
-        let data = self.get_stream_mut().extract_write_buffer();
-
-        let mut buf = Vec::with_capacity(data.len() + 4);
-
-        let length = data.len() as u16;
-
-        let frame_header = FrameHeader {
-            channel: message.channel,
-            length,
-            frame_type: FrameType::Single,
-            encrypted: true,
-            is_control_message: message.is_control,
-        };
-
-        let frame_header_bytes = frame_header.to_bytes();
-
-        buf.extend_from_slice(&frame_header_bytes);
-        buf.extend_from_slice(&data);
-
-        self.get_stream_mut().write_raw(&mut buf);
-    }
-
-    pub fn get_stream_mut(&mut self) -> &mut S {
-        self.tls_stream.get_mut()
+        message.write(&mut self.tls_stream, true).unwrap()
     }
 
     fn start_loop(&mut self) {

@@ -1,3 +1,5 @@
+use std::io::{Read, Write};
+use openssl::ssl::SslStream;
 use crate::frame::{FrameHeader, FrameType};
 use crate::stream::AapSteam;
 
@@ -167,7 +169,7 @@ impl Message {
 
     pub fn write_unencrypted<S: AapSteam>(&self, stream: &mut S) -> std::io::Result<()> {
         let length = (self.data.len() + 2) as u16;
-        let total_length = length + 1 + 1 + 4; // TODO: Why + 4?
+        let total_length = length + 4;
 
         let mut buf = Vec::with_capacity(total_length as usize);
 
@@ -189,6 +191,123 @@ impl Message {
         buf.extend_from_slice(&self.data);
 
         stream.write_raw(&mut buf);
+
+        Ok(())
+    }
+
+    pub fn try_read<S: AapSteam>(stream: &mut SslStream<S>) -> std::io::Result<Option<Self>> {
+        let mut buf = vec![0u8; 4];
+        let read_size = stream.get_mut().read_raw(&mut buf)?;
+
+        if read_size == 0 {
+            return Ok(None);
+        }
+
+        let frame_header = FrameHeader::from_bytes(&buf);
+        let channel = frame_header.channel;
+        let frame_type = frame_header.frame_type;
+        let encrypted = frame_header.encrypted;
+        let length = frame_header.length;
+        let is_control = frame_header.is_control_message;
+
+        if frame_type == FrameType::First {
+            let mut buf = vec![0u8; 4];
+
+            loop {
+                let read_size = stream.get_mut().read_raw(&mut buf)?;
+
+                if read_size > 0 {
+                    break;
+                }
+            }
+
+            // TODO
+        }
+
+        let mut buf;
+        loop {
+            let read_size = if encrypted {
+                buf = vec![0u8; 131080];
+                let ret = stream.read(&mut buf)?;
+                buf = buf[..ret].to_vec();
+
+                ret
+            } else {
+                buf = vec![0u8; length as usize];
+
+                stream.get_mut().read_raw(&mut buf)?
+            };
+
+            if read_size > 0 || length == 0 {
+                break;
+            }
+        }
+
+        let mut data;
+        let msg_type;
+
+        if frame_type == FrameType::Single || frame_type == FrameType::First {
+            msg_type = u16::from_be_bytes([buf[0], buf[1]]);
+            data = buf[2..].to_vec();
+        } else {
+            msg_type = 0;
+            data = buf.to_vec();
+        }
+
+        // Read next Frame
+        if frame_type == FrameType::First || frame_type == FrameType::Middle {
+            let next_data;
+            loop {
+                let next_frame = Self::try_read(stream)?;
+                if let Some(next_frame) = next_frame {
+                    next_data = next_frame.data;
+                    break;
+                }
+            }
+
+            data.extend_from_slice(&next_data);
+        }
+
+        Ok(Some(Message{
+            channel,
+            is_control,
+            length: data.len() as u16,
+            msg_type,
+            data,
+        }))
+    }
+
+    pub fn write<S: AapSteam>(&self, stream: &mut SslStream<S>, encrypted: bool) -> std::io::Result<()> {
+        let mut data = Vec::with_capacity(self.length as usize + 2);
+
+        data.push(((self.msg_type >> 8) & 0xFF) as u8);
+        data.push((self.msg_type & 0xFF) as u8);
+
+        data.extend_from_slice(&self.data);
+
+        if encrypted {
+            let _ret = stream.write(&mut data)?;
+            data = stream.get_mut().extract_write_buffer();
+        }
+
+        let mut buf = Vec::with_capacity(data.len() + 4);
+
+        let length = data.len() as u16;
+
+        let frame_header = FrameHeader {
+            channel: self.channel,
+            length,
+            frame_type: FrameType::Single,
+            encrypted,
+            is_control_message: self.is_control,
+        };
+
+        let frame_header_bytes = frame_header.to_bytes();
+
+        buf.extend_from_slice(&frame_header_bytes);
+        buf.extend_from_slice(&data);
+
+        stream.get_mut().write_raw(&mut buf);
 
         Ok(())
     }
