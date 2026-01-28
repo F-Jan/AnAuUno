@@ -8,22 +8,21 @@ use crate::channel::microphone::MicrophoneChannel;
 use crate::channel::sensor::SensorChannel;
 use crate::channel::video::VideoChannel;
 use crate::channel::Channel;
-use crate::message::{Message, ControlMessageType};
+use crate::message::{ControlMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::stream::AapSteam;
-use openssl::ssl::{Ssl, SslConnector, SslContext, SslMethod, SslStream, SslVerifyMode};
-use openssl::x509::X509;
-use openssl::pkey::PKey;
+use crate::tls::TlsStream;
 use protobuf::{CodedOutputStream, Message as ProtobufMessage};
+use core::marker::PhantomData;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::{mpsc, Arc, Mutex};
 
 static CERT_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/cert2.pem"));
 static KEY_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/private2.pem"));
 
-pub struct AapConnection<S: AapSteam> {
-    tls_stream: SslStream<S>,
+pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
+    tls_stream: T,
     control_channel: ControlChannel,
     sensor_channel: SensorChannel,
     video_channel: VideoChannel,
@@ -34,29 +33,11 @@ pub struct AapConnection<S: AapSteam> {
     microphone_channel: MicrophoneChannel,
     media_play_back_channel: MediaPlayBackChannel,
     receiver: Arc<Mutex<Receiver<Message>>>,
+    _phantom: PhantomData<S>,
 }
 
-impl<S: AapSteam> AapConnection<S> {
-    pub fn new(stream: S, buffer_sender: Sender<Vec<u8>>) -> Self {
-        let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
-        builder.set_verify(SslVerifyMode::NONE); // In Produktion: VERIFY_PEER
-
-        // Load cert/key from compile-time embedded bytes
-        let cert = X509::from_pem(CERT_PEM).expect("Invalid CERT PEM");
-        let pkey = PKey::private_key_from_pem(KEY_PEM).expect("Invalid KEY PEM");
-
-        builder.set_certificate(&cert).expect("Failed to set certificate");
-        builder.set_private_key(&pkey).expect("Failed to set private key");
-
-        builder.set_min_proto_version(Some(openssl::ssl::SslVersion::TLS1_2)).unwrap();
-        builder.set_max_proto_version(Some(openssl::ssl::SslVersion::TLS1_2)).unwrap();
-
-        let mut ssl = Ssl::new(builder.build().configure().unwrap().ssl_context()).unwrap();
-        ssl.set_connect_state();
-
-        let tls_stream = SslStream::new(ssl, stream).unwrap();
-
-
+impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
+    pub fn new(stream: T, buffer_sender: Sender<Vec<u8>>) -> Self {
         let (sender, receiver) = mpsc::channel();
         let sender = Arc::new(Mutex::new(sender));
 
@@ -71,7 +52,7 @@ impl<S: AapSteam> AapConnection<S> {
         let media_play_back_channel = MediaPlayBackChannel::new(Arc::clone(&sender));
 
         AapConnection {
-            tls_stream,
+            tls_stream: stream,
             control_channel,
             sensor_channel,
             video_channel,
@@ -82,6 +63,7 @@ impl<S: AapSteam> AapConnection<S> {
             microphone_channel,
             media_play_back_channel,
             receiver: Arc::new(Mutex::new(receiver)),
+            _phantom: PhantomData,
         }
     }
 

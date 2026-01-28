@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 use openssl::ssl::SslStream;
 use crate::frame::{FrameHeader, FrameType};
 use crate::stream::AapSteam;
+use crate::tls::TlsStream;
 
 pub struct Message {
     pub channel: u8,
@@ -195,7 +196,7 @@ impl Message {
         Ok(())
     }
 
-    pub fn try_read<S: AapSteam>(stream: &mut SslStream<S>) -> crate::error::Result<Option<Self>> {
+    pub fn try_read<S: AapSteam, T: TlsStream<S>>(stream: &mut T) -> crate::error::Result<Option<Self>> {
         let mut buf = vec![0u8; 4];
         let read_size = stream.get_mut().read_raw(&mut buf)?;
 
@@ -277,7 +278,7 @@ impl Message {
         }))
     }
 
-    pub fn write<S: AapSteam>(&self, stream: &mut SslStream<S>, encrypted: bool) -> crate::error::Result<()> {
+    pub fn write<S: AapSteam, T: TlsStream<S>>(&self, stream: &mut T, encrypted: bool) -> crate::error::Result<()> {
         let mut data = Vec::with_capacity(self.length as usize + 2);
 
         data.push(((self.msg_type >> 8) & 0xFF) as u8);

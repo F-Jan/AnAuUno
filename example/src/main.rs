@@ -4,6 +4,7 @@ use gstreamer::prelude::*;
 use gstreamer_app::AppSrc;
 use rusb::{Context, Device, DeviceHandle, Hotplug, HotplugBuilder, UsbContext};
 use std::thread;
+use anauuno::tls::openssl::OpenSSLTlsStream;
 
 // AOA‑Setup‑Requests
 const ACCESSORY_GET_PROTOCOL: u8       = 51;
@@ -114,6 +115,7 @@ impl Hotplug<Context> for USBHandler {
                 let (sender, receiver) = std::sync::mpsc::channel();
 
                 let stream = UsbAapStream::new(handle, 0x81, 0x01);
+                let stream = OpenSSLTlsStream::new(stream);
                 let mut connection = AapConnection::new(stream, sender);
 
 
