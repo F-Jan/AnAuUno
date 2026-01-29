@@ -1,5 +1,3 @@
-use std::io::{Read, Write};
-use openssl::ssl::SslStream;
 use crate::frame::{FrameHeader, FrameType};
 use crate::stream::AapSteam;
 use crate::tls::TlsStream;

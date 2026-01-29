@@ -43,10 +43,6 @@ impl<S: AapSteam> TlsStream<S> for OpenSSLTlsStream<S> {
         
         Ok(())
     }
-    
-    fn finish_handshake(&mut self) {
-        self.get_mut().finish_handshake();
-    }
 
     fn get_mut(&mut self) -> &mut S {
         self.stream.get_mut()
