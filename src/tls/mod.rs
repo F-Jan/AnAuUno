@@ -1,6 +1,7 @@
 use crate::stream::AapSteam;
 
 pub mod openssl;
+pub mod certs;
 
 pub trait TlsStream<S: AapSteam>{
     fn do_handshake(&mut self) -> crate::error::Result<()>;

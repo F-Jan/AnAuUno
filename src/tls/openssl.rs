@@ -1,12 +1,11 @@
-use std::io::{Read, Write};
+use crate::stream::AapSteam;
+use crate::tls::TlsStream;
 use openssl::pkey::PKey;
 use openssl::ssl::{Ssl, SslConnector, SslMethod, SslStream, SslVerifyMode};
 use openssl::x509::X509;
-use crate::stream::AapSteam;
-use crate::tls::TlsStream;
+use std::io::{Read, Write};
 
-static CERT_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/cert2.pem"));
-static KEY_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/private2.pem"));
+use crate::tls::certs::{CERT_PEM_STR, KEY_PEM_STR};
 
 pub struct OpenSSLTlsStream<S: AapSteam> {
     stream: SslStream<S>,
@@ -18,8 +17,8 @@ impl<S: AapSteam> OpenSSLTlsStream<S> {
         builder.set_verify(SslVerifyMode::NONE); // In Produktion: VERIFY_PEER
 
         // Load cert/key from compile-time embedded bytes
-        let cert = X509::from_pem(CERT_PEM).expect("Invalid CERT PEM");
-        let pkey = PKey::private_key_from_pem(KEY_PEM).expect("Invalid KEY PEM");
+        let cert = X509::from_pem(CERT_PEM_STR.as_bytes()).expect("Invalid CERT PEM");
+        let pkey = PKey::private_key_from_pem(KEY_PEM_STR.as_bytes()).expect("Invalid KEY PEM");
 
         builder.set_certificate(&cert).expect("Failed to set certificate");
         builder.set_private_key(&pkey).expect("Failed to set private key");

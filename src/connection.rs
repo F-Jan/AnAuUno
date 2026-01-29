@@ -18,9 +18,6 @@ use core::marker::PhantomData;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::{mpsc, Arc, Mutex};
 
-static CERT_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/cert2.pem"));
-static KEY_PEM: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/certs/private2.pem"));
-
 pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
     tls_stream: T,
     control_channel: ControlChannel,
