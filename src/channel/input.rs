@@ -3,7 +3,7 @@ use crate::message::{InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::input::KeyBindingRequest;
 use crate::protobuf::input;
-use protobuf::{CodedOutputStream, Message as ProtobufMessage};
+use protobuf::{CodedOutputStream, Message as ProtobufMessage, MessageField};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 
@@ -30,7 +30,7 @@ impl InputChannel {
 
     fn handle_binding_request(message: Message) -> Message {
         let data = KeyBindingRequest::parse_from_bytes(message.data.as_slice()).unwrap();
-        println!("BindingRequest: {:#?}", data);
+        println!("BindingRequest(Channel {} {}): {:#?}", message.channel, message.is_control, data);
 
         let mut config = input::BindingResponse::new();
         config.set_status(MessageStatus::StatusOk);
@@ -50,29 +50,44 @@ impl InputChannel {
         }
     }
 
-    fn send_key_event(&mut self, keycode: u32, down: bool) {
+    pub fn send_key_event(&mut self, keycode: u32, down: bool) {
         let mut key = input::Key::new();
         key.down = Some(down);
         key.keycode = Some(keycode);
 
         let mut key_event = input::KeyEvent::new();
-        key_event.keys.push(
-            key
-        );
+        key_event.keys.push(key);
 
-        let mut data = Vec::with_capacity(key_event.compute_size() as usize);
+        // WICHTIG: Android Auto erwartet i.d.R. ein InputReport als Event-Payload
+        let mut report = input::InputReport::new();
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        // proto2 "required" -> in rust-protobuf meist via setter
+        report.set_timestamp(ts);
+        report.key_event = MessageField::from_option(Some(key_event));
+
+        println!("Send InputReport(Event): {:#?}", report);
+
+        let mut data = Vec::with_capacity(report.compute_size() as usize);
         let mut cos = CodedOutputStream::new(&mut data);
-        key_event.write_to_with_cached_sizes(&mut cos).unwrap();
+        report.write_to_with_cached_sizes(&mut cos).unwrap();
         cos.flush().unwrap();
         drop(cos);
 
-        self.get_out_sender().lock().unwrap().send(Message {
-            channel: 3, // Input Channel
-            is_control: false,
-            length: 0,
-            msg_type: InputMessageType::Event as u16,
-            data,
-        }).unwrap();
+        self.get_out_sender()
+            .lock()
+            .unwrap()
+            .send(Message {
+                channel: 3, // Input Channel
+                is_control: false,
+                length: 0,
+                msg_type: InputMessageType::InputReport as u16,
+                data,
+            })
+            .unwrap();
     }
 }
 

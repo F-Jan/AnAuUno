@@ -103,7 +103,7 @@ impl ControlChannel {
         video_configuration.margin_width = Some(0);
         video_configuration.set_codec_resolution(VideoCodecResolutionType::_1280x720);
         video_configuration.set_frame_rate(VideoFrameRateType::_30);
-        video_configuration.density = Some(260);
+        video_configuration.density = Some(216);
 
         media_sink.video_configs.push(video_configuration);
 
@@ -219,7 +219,7 @@ impl ControlChannel {
             model: Some("x".to_owned()),
             year: Some("2025".to_owned()),
             vehicle_id: Some("x".to_owned()),
-            driver_position: Some(true), // true for RHS, false for LHS
+            left_hand_traffic: Some(false),
             head_unit_make: Some("x".to_owned()),
             head_unit_model: Some("rust_aoa".to_owned()),
             head_unit_software_build: Some("1.0".to_owned()),

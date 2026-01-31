@@ -109,7 +109,7 @@ impl MediaMessageType {
 }
 
 pub enum InputMessageType {
-    Event = 0x8001,
+    InputReport = 0x8001,
     BindingRequest = 0x8002,
     BindingResponse = 0x8003,
 }
@@ -117,7 +117,7 @@ pub enum InputMessageType {
 impl InputMessageType {
     pub fn from_u16(value: u16) -> Option<Self> {
         match value {
-            0x8001 => Some(InputMessageType::Event),
+            0x8001 => Some(InputMessageType::InputReport),
             0x8002 => Some(InputMessageType::BindingRequest),
             0x8003 => Some(InputMessageType::BindingResponse),
             _ => None,

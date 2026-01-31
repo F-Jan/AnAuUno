@@ -8,7 +8,7 @@ use crate::channel::microphone::MicrophoneChannel;
 use crate::channel::sensor::SensorChannel;
 use crate::channel::video::VideoChannel;
 use crate::channel::Channel;
-use crate::message::{ControlMessageType, Message};
+use crate::message::{ControlMessageType, InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::stream::AapSteam;
@@ -30,11 +30,12 @@ pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
     microphone_channel: MicrophoneChannel,
     media_play_back_channel: MediaPlayBackChannel,
     receiver: Arc<Mutex<Receiver<Message>>>,
+    key_event_receiver: Receiver<(u32, bool)>,
     _phantom: PhantomData<S>,
 }
 
 impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
-    pub fn new(stream: T, buffer_sender: Sender<Vec<u8>>) -> Self {
+    pub fn new(stream: T, buffer_sender: Sender<Vec<u8>>, key_event_receiver: Receiver<(u32, bool)>) -> Self {
         let (sender, receiver) = mpsc::channel();
         let sender = Arc::new(Mutex::new(sender));
 
@@ -60,6 +61,7 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
             microphone_channel,
             media_play_back_channel,
             receiver: Arc::new(Mutex::new(receiver)),
+            key_event_receiver,
             _phantom: PhantomData,
         }
     }
@@ -112,10 +114,27 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
         self.control_channel.start();
 
         loop {
+            let key_event = self.key_event_receiver.try_recv();
+            match key_event {
+                Ok((keycode, down)) => {
+                    self.send_key_event(keycode, down);
+                }
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    todo!("Channel Disconnected")
+                }
+            }
+
             let channel_message = self.receiver.lock().unwrap().try_recv();
 
             match channel_message {
                 Ok(msg) => {
+                    if msg.channel == 3 && msg.msg_type == InputMessageType::InputReport as u16 {
+                        println!("Input Report");
+                    } else if msg.channel == 3 && msg.msg_type == InputMessageType::BindingResponse as u16 {
+                        println!("Binding Response");
+                    }
+
                     self.write_message(msg, true).unwrap();
                 }
                 Err(TryRecvError::Empty) => {}
@@ -145,7 +164,7 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
                     }
 
                     let return_msg = self.handle_channel_open_request(message);
-                    self.write_message(return_msg, true);
+                    self.write_message(return_msg, true).unwrap();
                 } else {
                     match message.channel {
                         0 => self.control_channel.send_message(message),
@@ -190,5 +209,9 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
             msg_type: ControlMessageType::ChannelOpenResponse as u16,
             data: data.to_vec(),
         }
+    }
+    
+    pub fn send_key_event(&mut self, keycode: u32, down: bool) {
+        self.input_channel.send_key_event(keycode, down);
     }
 }

@@ -169,7 +169,7 @@ message ServiceDiscoveryResponse
     required string model = 3;
     required string year = 4;
     required string vehicle_id = 5;
-    required bool driver_position = 6;
+    required bool left_hand_traffic = 6;
     required string head_unit_make = 7;
     required string head_unit_model = 8;
     required string head_unit_software_build = 9;
