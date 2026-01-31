@@ -1,9 +1,9 @@
 use crate::channel::Channel;
 use crate::message::{InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
-use crate::protobuf::input::KeyBindingRequest;
 use crate::protobuf::input;
-use protobuf::{CodedOutputStream, Message as ProtobufMessage, MessageField};
+use crate::protobuf::input::KeyBindingRequest;
+use protobuf::{Message as ProtobufMessage, MessageField};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 
@@ -33,21 +33,14 @@ impl InputChannel {
         println!("BindingRequest(Channel {} {}): {:#?}", message.channel, message.is_control, data);
 
         let mut config = input::BindingResponse::new();
-        config.set_status(MessageStatus::StatusOk);
+        config.set_status(MessageStatus::Ok);
 
-        let mut data = Vec::with_capacity(config.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        config.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
-        Message {
-            channel: message.channel,
-            is_control: false,
-            length: 0,
-            msg_type: InputMessageType::BindingResponse as u16,
-            data,
-        }
+        Message::new_with_protobuf_message(
+            message.channel, 
+            message.is_control, 
+            config, 
+            InputMessageType::BindingResponse as u16
+        )
     }
 
     pub fn send_key_event(&mut self, keycode: u32, down: bool) {
@@ -71,22 +64,15 @@ impl InputChannel {
 
         println!("Send InputReport(Event): {:#?}", report);
 
-        let mut data = Vec::with_capacity(report.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        report.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
         self.get_out_sender()
             .lock()
             .unwrap()
-            .send(Message {
-                channel: 3, // Input Channel
-                is_control: false,
-                length: 0,
-                msg_type: InputMessageType::InputReport as u16,
-                data,
-            })
+            .send(Message::new_with_protobuf_message(
+                3, 
+                false, 
+                report, 
+                InputMessageType::InputReport as u16
+            ))
             .unwrap();
     }
 }

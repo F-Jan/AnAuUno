@@ -3,7 +3,7 @@ use crate::message::{MediaMessageType, Message};
 use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
 use crate::protobuf::media::{MediaSetupRequest, VideoFocusMode, VideoFocusRequestNotification};
-use protobuf::{CodedOutputStream, Message as ProtobufMessage};
+use protobuf::Message as ProtobufMessage;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 
@@ -46,19 +46,12 @@ impl VideoChannel {
             config.set_max_unacked(1);
             config.configuration_indices.push(0u32);
 
-            let mut data = Vec::with_capacity(config.compute_size() as usize);
-            let mut cos = CodedOutputStream::new(&mut data);
-            config.write_to_with_cached_sizes(&mut cos).unwrap();
-            cos.flush().unwrap();
-            drop(cos);
-
-            sender.lock().unwrap().send(Message {
-                channel: message.channel,
-                is_control: false,
-                length: 0,
-                msg_type: MediaMessageType::ConfigResponse as u16,
-                data,
-            }).unwrap();
+            sender.lock().unwrap().send(Message::new_with_protobuf_message(
+                message.channel,
+                false,
+                config,
+                MediaMessageType::ConfigResponse as u16
+            )).unwrap();
 
 
 
@@ -66,19 +59,12 @@ impl VideoChannel {
             config.set_mode(VideoFocusMode::Focused);
             config.set_unsolicited(false);
 
-            let mut data = Vec::with_capacity(config.compute_size() as usize);
-            let mut cos = CodedOutputStream::new(&mut data);
-            config.write_to_with_cached_sizes(&mut cos).unwrap();
-            cos.flush().unwrap();
-            drop(cos);
-
-            sender.lock().unwrap().send(Message {
-                channel: message.channel,
-                is_control: false,
-                length: 0,
-                msg_type: MediaMessageType::VideoFocusNotification as u16,
-                data,
-            }).unwrap();
+            sender.lock().unwrap().send(Message::new_with_protobuf_message(
+                message.channel,
+                false,
+                config,
+                MediaMessageType::VideoFocusNotification as u16
+            )).unwrap();
         }
     }
 
@@ -89,19 +75,12 @@ impl VideoChannel {
         config.set_mode(VideoFocusMode::Focused);
         config.set_unsolicited(false);
 
-        let mut data = Vec::with_capacity(config.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        config.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
-        Message {
-            channel: message.channel,
-            is_control: false,
-            length: 0,
-            msg_type: MediaMessageType::VideoFocusNotification as u16,
-            data,
-        }
+        Message::new_with_protobuf_message(
+            message.channel,
+            false,
+            config,
+            MediaMessageType::VideoFocusNotification as u16
+        )
     }
 
     pub fn handle_media_start_request(message: Message, data: Arc<Mutex<VideoChannelData>>) {
@@ -118,20 +97,12 @@ impl VideoChannel {
         ack.set_session_id(session_id);
         ack.set_ack(1);
 
-        let mut data = Vec::with_capacity(ack.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        ack.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-        
-        let message = Message{
-            channel: 2,
-            is_control: false,
-            length: 0,
-            msg_type: MediaMessageType::Ack as u16,
-            data,
-        };
-        sender.lock().unwrap().send(message).unwrap();
+        sender.lock().unwrap().send(Message::new_with_protobuf_message(
+            2,
+            false,
+            ack,
+            MediaMessageType::Ack as u16
+        )).unwrap();
     }
 }
 

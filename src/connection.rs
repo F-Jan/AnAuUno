@@ -13,8 +13,8 @@ use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::stream::AapSteam;
 use crate::tls::TlsStream;
-use protobuf::{CodedOutputStream, Message as ProtobufMessage};
 use core::marker::PhantomData;
+use protobuf::Message as ProtobufMessage;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::{mpsc, Arc, Mutex};
 
@@ -194,21 +194,14 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
         // TODO
 
         let mut response = ChannelOpenResponse::new();
-        response.set_status(MessageStatus::StatusOk);
+        response.set_status(MessageStatus::Ok);
 
-        let mut data = Vec::with_capacity(response.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        response.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
-        Message {
-            channel: message.channel,
-            is_control: true,
-            length: data.len() as u16,
-            msg_type: ControlMessageType::ChannelOpenResponse as u16,
-            data: data.to_vec(),
-        }
+        Message::new_with_protobuf_message(
+            message.channel,
+            true,
+            response,
+            ControlMessageType::ChannelOpenResponse as u16
+        )
     }
     
     pub fn send_key_event(&mut self, keycode: u32, down: bool) {

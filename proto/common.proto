@@ -2,6 +2,39 @@ syntax = "proto2";
 
 enum MessageStatus
 {
-    StatusOk = 0;
+    Ok = 0;
+    Error = 1;
+
+    // TODO:
+    TODO_1 = -1;
+    TODO_2 = -2;
+    TODO_3 = -3;
+    TODO_4 = -4;
+    TODO_5 = -5;
+    TODO_6 = -6;
+    TODO_7 = -7;
+    TODO_8 = -8;
+    TODO_9 = -9;
+    TODO_10 = -10;
+    TODO_11 = -11;
+    TODO_12 = -12;
+    TODO_13 = -13;
+    TODO_14 = -14;
+    TODO_15 = -15;
+    TODO_16 = -16;
+    TODO_17 = -17;
+    TODO_18 = -18;
+    TODO_19 = -19;
+    TODO_20 = -20;
+    TODO_21 = -21;
+    TODO_22 = -22;
+    TODO_23 = -23;
+    TODO_24 = -24;
+    TODO_25 = -25;
+    TODO_250 = -250;
+    TODO_251 = -251;
+    TODO_253 = -253;
+    TODO_254 = -254;
+    TODO_255 = -255;
 }
 

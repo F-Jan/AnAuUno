@@ -131,6 +131,19 @@ pub enum NavigationMessageType {
 }
 
 impl Message {
+    pub fn new_with_protobuf_message<T: protobuf::Message>(channel: u8, is_control: bool, protobuf_message: T, msg_type: u16) -> Self {
+        let mut data = Vec::with_capacity(protobuf_message.compute_size() as usize);
+        protobuf_message.write_to_vec(&mut data).unwrap();
+
+        Message {
+            channel,
+            is_control,
+            data,
+            msg_type,
+            length: 0,
+        }
+    }
+
     pub fn read_unencrypted<S: AapSteam>(stream: &mut S) -> crate::error::Result<Self> {
         let mut buf = vec![0u8; 6];
         loop {

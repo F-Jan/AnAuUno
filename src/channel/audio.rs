@@ -1,11 +1,11 @@
 use crate::channel::Channel;
 use crate::message::{MediaMessageType, Message};
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
-use protobuf::{CodedOutputStream, Message as ProtobufMessage};
 use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
 use crate::protobuf::media::MediaSetupRequest;
+use protobuf::Message as ProtobufMessage;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc, Mutex};
 
 pub struct AudioChannelData {}
 
@@ -38,19 +38,12 @@ impl AudioChannel {
             config.set_max_unacked(1);
             config.configuration_indices.push(0u32);
 
-            let mut data = Vec::with_capacity(config.compute_size() as usize);
-            let mut cos = CodedOutputStream::new(&mut data);
-            config.write_to_with_cached_sizes(&mut cos).unwrap();
-            cos.flush().unwrap();
-            drop(cos);
-
-            return Some(Message {
-                channel: message.channel,
-                is_control: false,
-                length: 0,
-                msg_type: MediaMessageType::ConfigResponse as u16,
-                data,
-            });
+            return Some(Message::new_with_protobuf_message(
+                message.channel, 
+                false, 
+                config, 
+                MediaMessageType::ConfigResponse as u16
+            ));
         }
 
         None

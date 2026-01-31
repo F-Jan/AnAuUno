@@ -1,5 +1,5 @@
 use crate::channel::Channel;
-use crate::message::{Message, ControlMessageType};
+use crate::message::{ControlMessageType, Message};
 use crate::protobuf::control::audio_focus_notification::AudioFocusStateType;
 use crate::protobuf::control::audio_focus_request_notification::AudioFocusRequestType;
 use crate::protobuf::control::service::media_sink_service::video_configuration::{VideoCodecResolutionType, VideoFrameRateType};
@@ -10,7 +10,7 @@ use crate::protobuf::control::{AudioFocusNotification, AudioFocusRequestNotifica
 use crate::protobuf::input::KeyCode;
 use crate::protobuf::media::{AudioConfiguration, AudioStreamType, MediaCodecType};
 use crate::protobuf::sensors::SensorType;
-use protobuf::{CodedOutputStream, Enum, Message as ProtobufMessage};
+use protobuf::{Enum, Message as ProtobufMessage};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 
@@ -57,19 +57,12 @@ impl ControlChannel {
         let mut notification = AudioFocusNotification::new();
         notification.set_focus_state(audio_focus_state_type);
 
-        let mut data = Vec::with_capacity(notification.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        notification.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
-        Message {
-            channel: 0,
-            is_control: false,
-            length: data.len() as u16,
-            msg_type: ControlMessageType::AudioFocusNotification as u16,
-            data: data.to_vec(),
-        }
+        Message::new_with_protobuf_message(
+            0, 
+            false, 
+            notification, 
+            ControlMessageType::AudioFocusNotification as u16
+        )
     }
 
     fn handle_service_discovery_request(message: Message) -> Message {
@@ -231,20 +224,13 @@ impl ControlChannel {
         };
 
         //println!("{:#?}", res);
-
-        let mut data = Vec::with_capacity(res.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        res.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
-        Message {
-            channel: 0,
-            is_control: false,
-            length: data.len() as u16,
-            msg_type: ControlMessageType::ServiceDiscoveryResponse as u16,
-            data: data.to_vec(),
-        }
+        
+        Message::new_with_protobuf_message(
+            0, 
+            false, 
+            res, 
+            ControlMessageType::ServiceDiscoveryResponse as u16
+        )
     }
 }
 

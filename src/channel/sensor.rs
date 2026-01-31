@@ -4,7 +4,7 @@ use crate::protobuf::common::MessageStatus;
 use crate::protobuf::sensors;
 use crate::protobuf::sensors::sensor_batch::{driving_status_data, DrivingStatusData};
 use crate::protobuf::sensors::SensorRequest;
-use protobuf::{CodedOutputStream, Message as ProtobufMessage};
+use protobuf::Message as ProtobufMessage;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 
@@ -35,41 +35,27 @@ impl SensorChannel {
         //println!("SensorStartRequest: {:#?}", data.type_);
 
         let mut config = sensors::SensorResponse::new();
-        config.set_status(MessageStatus::StatusOk);
-
-        let mut data = Vec::with_capacity(config.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        config.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
-        sender.lock().unwrap().send(Message {
-            channel: message.channel,
-            is_control: false,
-            length: 0,
-            msg_type: SensorsMessageType::StartResponse as u16,
-            data,
-        }).unwrap();
+        config.set_status(MessageStatus::Ok);
+        
+        sender.lock().unwrap().send(Message::new_with_protobuf_message(
+            message.channel, 
+            false, 
+            config, 
+            SensorsMessageType::StartResponse as u16
+        )).unwrap();
 
 
         let mut config = sensors::SensorBatch::new();
         let mut driving_status_data = DrivingStatusData::new();
         driving_status_data.set_status(driving_status_data::Status::Unrestricted as i32);
         config.driving_status.push(driving_status_data);
-
-        let mut data = Vec::with_capacity(config.compute_size() as usize);
-        let mut cos = CodedOutputStream::new(&mut data);
-        config.write_to_with_cached_sizes(&mut cos).unwrap();
-        cos.flush().unwrap();
-        drop(cos);
-
-        sender.lock().unwrap().send(Message {
-            channel: message.channel,
-            is_control: false,
-            length: 0,
-            msg_type: SensorsMessageType::Event as u16,
-            data,
-        }).unwrap();
+        
+        sender.lock().unwrap().send(Message::new_with_protobuf_message(
+            message.channel, 
+            false, 
+            config, 
+            SensorsMessageType::Event as u16
+        )).unwrap();
     }
 }
 
