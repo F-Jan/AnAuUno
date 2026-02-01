@@ -1,4 +1,3 @@
-use crate::channel::Channel;
 use crate::message::{ControlMessageType, Message};
 use crate::protobuf::control::audio_focus_notification::AudioFocusStateType;
 use crate::protobuf::control::audio_focus_request_notification::AudioFocusRequestType;
@@ -6,40 +5,25 @@ use crate::protobuf::control::service::media_sink_service::video_configuration::
 use crate::protobuf::control::service::media_sink_service::VideoConfiguration;
 use crate::protobuf::control::service::sensor_source_service::Sensor;
 use crate::protobuf::control::service::{InputSourceService, MediaPlaybackStatusService, MediaSinkService, MediaSourceService, SensorSourceService};
-use crate::protobuf::control::{AudioFocusNotification, AudioFocusRequestNotification, Service, ServiceDiscoveryResponse};
+use crate::protobuf::control::{AudioFocusNotification, AudioFocusRequestNotification, ServiceDiscoveryResponse};
 use crate::protobuf::input::KeyCode;
 use crate::protobuf::media::{AudioConfiguration, AudioStreamType, MediaCodecType};
 use crate::protobuf::sensors::SensorType;
-use protobuf::{Enum, Message as ProtobufMessage};
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
+use crate::service::Service;
+use protobuf::{Enum, Message as ProtoMessage};
 
-pub struct ControlChannelData {}
-
-pub struct ControlChannel {
-    receiver: Arc<Mutex<Receiver<Option<Message>>>>,
-    in_sender: Arc<Mutex<Sender<Option<Message>>>>,
-    out_sender: Arc<Mutex<Sender<Message>>>,
-    data: Arc<Mutex<ControlChannelData>>,
+pub struct ControlService {
+    messages: Vec<Message>
 }
 
-impl ControlChannel {
-    pub fn new(out_sender: Arc<Mutex<Sender<Message>>>) -> Self {
-        let (sender, receiver) = mpsc::channel::<Option<Message>>();
-
+impl ControlService {
+    pub fn new() -> Self {
         Self {
-            receiver: Arc::new(Mutex::new(receiver)),
-            in_sender: Arc::new(Mutex::new(sender)),
-            out_sender,
-            data: Arc::new(Mutex::new(ControlChannelData {})),
+            messages: vec![]
         }
     }
 
-    pub fn get_in_sender(&self) -> Arc<Mutex<Sender<Option<Message>>>> {
-        Arc::clone(&self.in_sender)
-    }
-
-    fn handle_audio_focus_request_notification(message: Message) -> Message {
+    fn handle_audio_focus_request_notification(&mut self, message: Message) {
         let data  = AudioFocusRequestNotification::parse_from_bytes(message.data.as_slice()).unwrap();
         println!("{:#?} {}", data, data.request.unwrap().unwrap().value());
 
@@ -57,19 +41,19 @@ impl ControlChannel {
         let mut notification = AudioFocusNotification::new();
         notification.set_focus_state(audio_focus_state_type);
 
-        Message::new_with_protobuf_message(
-            0, 
-            false, 
-            notification, 
+        self.send_message(Message::new_with_protobuf_message(
+            0,
+            false,
+            notification,
             ControlMessageType::AudioFocusNotification as u16
-        )
+        ));
     }
 
-    fn handle_service_discovery_request(message: Message) -> Message {
+    fn handle_service_discovery_request(&mut self, message: Message) {
         let mut services = vec![];
 
         // Sensor
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(1);
 
         let mut sensor = Sensor::new();
@@ -83,7 +67,7 @@ impl ControlChannel {
         services.push(service);
 
         // Video
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(2);
 
         let mut media_sink = MediaSinkService::new();
@@ -105,7 +89,7 @@ impl ControlChannel {
         services.push(service);
 
         // Input
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(3);
 
         /*let mut touch_config = TouchConfig::new();
@@ -125,7 +109,7 @@ impl ControlChannel {
         services.push(service);
 
         // Media Audio
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(6);
 
         let mut media_sink = MediaSinkService::new();
@@ -144,7 +128,7 @@ impl ControlChannel {
         services.push(service);
 
         // Speech Audio
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(4);
 
         let mut media_sink = MediaSinkService::new();
@@ -163,7 +147,7 @@ impl ControlChannel {
         services.push(service);
 
         // System Audio
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(5);
 
         let mut media_sink = MediaSinkService::new();
@@ -182,7 +166,7 @@ impl ControlChannel {
         services.push(service);
 
         // Microphone
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(7);
 
         let mut media_source = MediaSourceService::new();
@@ -200,7 +184,7 @@ impl ControlChannel {
         services.push(service);
 
         // Media Playback Status
-        let mut service = Service::new();
+        let mut service = crate::protobuf::control::Service::new();
         service.id = Some(9);
 
         service.media_playback_service = Some(MediaPlaybackStatusService::new()).into();
@@ -224,29 +208,27 @@ impl ControlChannel {
         };
 
         //println!("{:#?}", res);
-        
-        Message::new_with_protobuf_message(
-            0, 
-            false, 
-            res, 
+
+        self.send_message(Message::new_with_protobuf_message(
+            0,
+            false,
+            res,
             ControlMessageType::ServiceDiscoveryResponse as u16
-        )
+        ));
     }
 }
 
-impl Channel<ControlChannelData> for ControlChannel {
-    fn handle_message(message: Message, sender: Arc<Mutex<Sender<Message>>>, data: Arc<Mutex<ControlChannelData>>) {
+impl Service for ControlService {
+    fn handle_message(&mut self, message: Message) {
         let msg_type = ControlMessageType::from_u16(message.msg_type);
 
         if let Some(msg_type) = msg_type {
             match msg_type {
                 ControlMessageType::ServiceDiscoveryRequest => {
-                    let return_msg = Self::handle_service_discovery_request(message);
-                    sender.lock().unwrap().send(return_msg).unwrap();
+                    self.handle_service_discovery_request(message);
                 }
                 ControlMessageType::AudioFocusRequestNotification => {
-                    let return_msg = Self::handle_audio_focus_request_notification(message);
-                    sender.lock().unwrap().send(return_msg).unwrap();
+                    self.handle_audio_focus_request_notification(message);
                 }
                 _ => {
                     println!("Unsupported Control: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
@@ -257,20 +239,7 @@ impl Channel<ControlChannelData> for ControlChannel {
         }
     }
 
-    fn send_message(&mut self, message: Message) {
-        let in_sender = self.in_sender.lock().unwrap();
-        in_sender.send(Some(message)).unwrap();
-    }
-
-    fn get_receiver(&mut self) -> Arc<Mutex<Receiver<Option<Message>>>> {
-        Arc::clone(&self.receiver)
-    }
-
-    fn get_out_sender(&mut self) -> Arc<Mutex<Sender<Message>>> {
-        Arc::clone(&self.out_sender)
-    }
-
-    fn get_channel_data(&mut self) -> Arc<Mutex<ControlChannelData>> {
-        Arc::clone(&self.data)
+    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
+        &mut self.messages
     }
 }

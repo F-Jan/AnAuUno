@@ -10,126 +10,6 @@ pub struct Message {
     pub data: Vec<u8>,
 }
 
-pub enum ControlMessageType {
-    VersionRequest = 0x01,
-    VersionResponse = 0x02,
-    Handshake = 0x03,
-    HandshakeOk = 0x04,
-    ServiceDiscoveryRequest = 0x05,
-    ServiceDiscoveryResponse = 0x06,
-    ChannelOpenRequest = 0x07,
-    ChannelOpenResponse = 0x08,
-    ChannelCloseNotification = 0x09,
-    PingRequest = 0x0B,
-    PingResponse = 0x0C,
-    NavFocusRequestNotification = 0x0D,
-    NavFocusNotification = 0x0E,
-    ByeByeRequest = 0x0F,
-    ByeByeResponse = 0x10,
-    VoiceSessionNotification = 0x11,
-    AudioFocusRequestNotification = 0x12,
-    AudioFocusNotification = 0x13,
-    CarConnectedDevicesRequest = 0x20,
-    CarConnectedDevicesResponse = 0x21,
-    UserSwitchRequest = 0x22,
-    BatteryStatusNotification = 0x23,
-    CallAvailabilityStatus = 0x24,
-    UserSwitchResponse = 0x25,
-    ServiceDiscoveryUpdate = 0x26,
-    UnexpectedMessage = 0xFF,
-    FramingError = 0xFFFF,
-}
-
-impl ControlMessageType {
-    pub fn from_u16(value: u16) -> Option<Self> {
-        match value {
-            0x01 => Some(ControlMessageType::VersionRequest),
-            0x02 => Some(ControlMessageType::VersionResponse),
-            0x03 => Some(ControlMessageType::Handshake),
-            0x04 => Some(ControlMessageType::HandshakeOk),
-            0x05 => Some(ControlMessageType::ServiceDiscoveryRequest),
-            0x06 => Some(ControlMessageType::ServiceDiscoveryResponse),
-            0x07 => Some(ControlMessageType::ChannelOpenRequest),
-            0x08 => Some(ControlMessageType::ChannelOpenResponse),
-            0x09 => Some(ControlMessageType::ChannelCloseNotification),
-            0x0B => Some(ControlMessageType::PingRequest),
-            0x0C => Some(ControlMessageType::PingResponse),
-            0x0D => Some(ControlMessageType::NavFocusRequestNotification),
-            0x0E => Some(ControlMessageType::NavFocusNotification),
-            0x0F => Some(ControlMessageType::ByeByeRequest),
-            0x10 => Some(ControlMessageType::ByeByeResponse),
-            0x11 => Some(ControlMessageType::VoiceSessionNotification),
-            0x12 => Some(ControlMessageType::AudioFocusRequestNotification),
-            0x13 => Some(ControlMessageType::AudioFocusNotification),
-            0x20 => Some(ControlMessageType::CarConnectedDevicesRequest),
-            0x21 => Some(ControlMessageType::CarConnectedDevicesResponse),
-            0x22 => Some(ControlMessageType::UserSwitchRequest),
-            0x23 => Some(ControlMessageType::BatteryStatusNotification),
-            0x24 => Some(ControlMessageType::CallAvailabilityStatus),
-            0x25 => Some(ControlMessageType::UserSwitchResponse),
-            0x26 => Some(ControlMessageType::ServiceDiscoveryUpdate),
-            0xFF => Some(ControlMessageType::UnexpectedMessage),
-            0xFFFF => Some(ControlMessageType::FramingError),
-            _ => None,
-        }
-    }
-}
-
-pub enum MediaMessageType {
-    MediaData = 0x00,
-    CodecData = 0x01,
-    SetupRequest = 0x8000,
-    StartRequest = 0x8001,
-    StopRequest = 0x8002,
-    ConfigResponse = 0x8003,
-    Ack = 0x8004,
-    MicRequest = 0x8005,
-    MicResponse = 0x8006,
-    VideoFocusRequestNotification = 0x8007,
-    VideoFocusNotification = 0x8008,
-}
-
-impl MediaMessageType {
-    pub fn from_u16(value: u16) -> Option<Self> {
-        match value {
-            0x00 => Some(MediaMessageType::MediaData),
-            0x01 => Some(MediaMessageType::CodecData),
-            0x8000 => Some(MediaMessageType::SetupRequest),
-            0x8001 => Some(MediaMessageType::StartRequest),
-            0x8002 => Some(MediaMessageType::StopRequest),
-            0x8003 => Some(MediaMessageType::ConfigResponse),
-            0x8004 => Some(MediaMessageType::Ack),
-            0x8005 => Some(MediaMessageType::MicRequest),
-            0x8006 => Some(MediaMessageType::MicResponse),
-            0x8007 => Some(MediaMessageType::VideoFocusRequestNotification),
-            0x8008 => Some(MediaMessageType::VideoFocusNotification),
-            _ => None
-        }
-    }
-}
-
-pub enum InputMessageType {
-    InputReport = 0x8001,
-    BindingRequest = 0x8002,
-    BindingResponse = 0x8003,
-}
-
-impl InputMessageType {
-    pub fn from_u16(value: u16) -> Option<Self> {
-        match value {
-            0x8001 => Some(InputMessageType::InputReport),
-            0x8002 => Some(InputMessageType::BindingRequest),
-            0x8003 => Some(InputMessageType::BindingResponse),
-            _ => None,
-        }
-    }
-}
-
-pub enum NavigationMessageType {
-    NextTurnDetails = 0x8004,
-    NextTurnDistanceAndTime = 0x8005,
-}
-
 impl Message {
     pub fn new_with_protobuf_message<T: protobuf::Message>(channel: u8, is_control: bool, protobuf_message: T, msg_type: u16) -> Self {
         let mut data = Vec::with_capacity(protobuf_message.compute_size() as usize);
@@ -142,6 +22,10 @@ impl Message {
             msg_type,
             length: 0,
         }
+    }
+    
+    pub fn to_protobuf_message<T: protobuf::Message>(&self) -> T {
+        T::parse_from_bytes(self.data.as_slice()).unwrap()
     }
 
     pub fn read_unencrypted<S: AapSteam>(stream: &mut S) -> crate::error::Result<Self> {
@@ -194,7 +78,7 @@ impl Message {
         };
 
         let frame_header_bytes = frame_header.to_bytes();
-        
+
         buf.extend_from_slice(&frame_header_bytes);
 
         buf.push(((self.msg_type >> 8) & 0xFF) as u8);
@@ -323,6 +207,126 @@ impl Message {
 
         Ok(())
     }
+}
+
+pub enum ControlMessageType {
+    VersionRequest = 0x01,
+    VersionResponse = 0x02,
+    Handshake = 0x03,
+    HandshakeOk = 0x04,
+    ServiceDiscoveryRequest = 0x05,
+    ServiceDiscoveryResponse = 0x06,
+    ChannelOpenRequest = 0x07,
+    ChannelOpenResponse = 0x08,
+    ChannelCloseNotification = 0x09,
+    PingRequest = 0x0B,
+    PingResponse = 0x0C,
+    NavFocusRequestNotification = 0x0D,
+    NavFocusNotification = 0x0E,
+    ByeByeRequest = 0x0F,
+    ByeByeResponse = 0x10,
+    VoiceSessionNotification = 0x11,
+    AudioFocusRequestNotification = 0x12,
+    AudioFocusNotification = 0x13,
+    CarConnectedDevicesRequest = 0x20,
+    CarConnectedDevicesResponse = 0x21,
+    UserSwitchRequest = 0x22,
+    BatteryStatusNotification = 0x23,
+    CallAvailabilityStatus = 0x24,
+    UserSwitchResponse = 0x25,
+    ServiceDiscoveryUpdate = 0x26,
+    UnexpectedMessage = 0xFF,
+    FramingError = 0xFFFF,
+}
+
+impl ControlMessageType {
+    pub fn from_u16(value: u16) -> Option<Self> {
+        match value {
+            0x01 => Some(ControlMessageType::VersionRequest),
+            0x02 => Some(ControlMessageType::VersionResponse),
+            0x03 => Some(ControlMessageType::Handshake),
+            0x04 => Some(ControlMessageType::HandshakeOk),
+            0x05 => Some(ControlMessageType::ServiceDiscoveryRequest),
+            0x06 => Some(ControlMessageType::ServiceDiscoveryResponse),
+            0x07 => Some(ControlMessageType::ChannelOpenRequest),
+            0x08 => Some(ControlMessageType::ChannelOpenResponse),
+            0x09 => Some(ControlMessageType::ChannelCloseNotification),
+            0x0B => Some(ControlMessageType::PingRequest),
+            0x0C => Some(ControlMessageType::PingResponse),
+            0x0D => Some(ControlMessageType::NavFocusRequestNotification),
+            0x0E => Some(ControlMessageType::NavFocusNotification),
+            0x0F => Some(ControlMessageType::ByeByeRequest),
+            0x10 => Some(ControlMessageType::ByeByeResponse),
+            0x11 => Some(ControlMessageType::VoiceSessionNotification),
+            0x12 => Some(ControlMessageType::AudioFocusRequestNotification),
+            0x13 => Some(ControlMessageType::AudioFocusNotification),
+            0x20 => Some(ControlMessageType::CarConnectedDevicesRequest),
+            0x21 => Some(ControlMessageType::CarConnectedDevicesResponse),
+            0x22 => Some(ControlMessageType::UserSwitchRequest),
+            0x23 => Some(ControlMessageType::BatteryStatusNotification),
+            0x24 => Some(ControlMessageType::CallAvailabilityStatus),
+            0x25 => Some(ControlMessageType::UserSwitchResponse),
+            0x26 => Some(ControlMessageType::ServiceDiscoveryUpdate),
+            0xFF => Some(ControlMessageType::UnexpectedMessage),
+            0xFFFF => Some(ControlMessageType::FramingError),
+            _ => None,
+        }
+    }
+}
+
+pub enum MediaMessageType {
+    MediaData = 0x00,
+    CodecData = 0x01,
+    SetupRequest = 0x8000,
+    StartRequest = 0x8001,
+    StopRequest = 0x8002,
+    ConfigResponse = 0x8003,
+    Ack = 0x8004,
+    MicRequest = 0x8005,
+    MicResponse = 0x8006,
+    VideoFocusRequestNotification = 0x8007,
+    VideoFocusNotification = 0x8008,
+}
+
+impl MediaMessageType {
+    pub fn from_u16(value: u16) -> Option<Self> {
+        match value {
+            0x00 => Some(MediaMessageType::MediaData),
+            0x01 => Some(MediaMessageType::CodecData),
+            0x8000 => Some(MediaMessageType::SetupRequest),
+            0x8001 => Some(MediaMessageType::StartRequest),
+            0x8002 => Some(MediaMessageType::StopRequest),
+            0x8003 => Some(MediaMessageType::ConfigResponse),
+            0x8004 => Some(MediaMessageType::Ack),
+            0x8005 => Some(MediaMessageType::MicRequest),
+            0x8006 => Some(MediaMessageType::MicResponse),
+            0x8007 => Some(MediaMessageType::VideoFocusRequestNotification),
+            0x8008 => Some(MediaMessageType::VideoFocusNotification),
+            _ => None
+        }
+    }
+}
+
+pub enum InputMessageType {
+    InputReport = 0x8001,
+    BindingRequest = 0x8002,
+    BindingResponse = 0x8003,
+}
+
+impl InputMessageType {
+    pub fn from_u16(value: u16) -> Option<Self> {
+        match value {
+            0x8001 => Some(InputMessageType::InputReport),
+            0x8002 => Some(InputMessageType::BindingRequest),
+            0x8003 => Some(InputMessageType::BindingResponse),
+            _ => None,
+        }
+    }
+}
+
+pub enum NavigationMessageType {
+    NextTurnDetails = 0x8004,
+    NextTurnDistanceAndTime = 0x8005,
 }
 
 pub enum PlaybackMessageType {

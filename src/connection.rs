@@ -1,53 +1,47 @@
-use crate::channel::audio::AudioChannel;
-use crate::channel::audio1::Audio1Channel;
-use crate::channel::audio2::Audio2Channel;
-use crate::channel::control::ControlChannel;
-use crate::channel::input::InputChannel;
-use crate::channel::media_play_back::MediaPlayBackChannel;
-use crate::channel::microphone::MicrophoneChannel;
-use crate::channel::sensor::SensorChannel;
-use crate::channel::video::VideoChannel;
-use crate::channel::Channel;
-use crate::message::{ControlMessageType, InputMessageType, Message};
+use crate::message::{ControlMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
+use crate::service::audio::AudioService;
+use crate::service::control::ControlService;
+use crate::service::input::InputService;
+use crate::service::media_play_back::MediaPlayBackService;
+use crate::service::microphone::MicrophoneService;
+use crate::service::sensor::SensorService;
+use crate::service::video::VideoService;
 use crate::stream::AapSteam;
 use crate::tls::TlsStream;
 use core::marker::PhantomData;
 use protobuf::Message as ProtobufMessage;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
-use std::sync::{mpsc, Arc, Mutex};
+use crate::channel::Channel;
+use crate::channel::thread::ThreadChannel;
 
 pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
     tls_stream: T,
-    control_channel: ControlChannel,
-    sensor_channel: SensorChannel,
-    video_channel: VideoChannel,
-    input_channel: InputChannel,
-    audio_channel: AudioChannel,
-    audio1_channel: Audio1Channel,
-    audio2_channel: Audio2Channel,
-    microphone_channel: MicrophoneChannel,
-    media_play_back_channel: MediaPlayBackChannel,
-    receiver: Arc<Mutex<Receiver<Message>>>,
+    control_channel: ThreadChannel<ControlService>,
+    sensor_channel: ThreadChannel<SensorService>,
+    video_channel: ThreadChannel<VideoService>,
+    input_channel: ThreadChannel<InputService>,
+    audio_channel: ThreadChannel<AudioService>,
+    audio1_channel: ThreadChannel<AudioService>,
+    audio2_channel: ThreadChannel<AudioService>,
+    microphone_channel: ThreadChannel<MicrophoneService>,
+    media_play_back_channel: ThreadChannel<MediaPlayBackService>,
     key_event_receiver: Receiver<(u32, bool)>,
     _phantom: PhantomData<S>,
 }
 
 impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
     pub fn new(stream: T, buffer_sender: Sender<Vec<u8>>, key_event_receiver: Receiver<(u32, bool)>) -> Self {
-        let (sender, receiver) = mpsc::channel();
-        let sender = Arc::new(Mutex::new(sender));
-
-        let control_channel = ControlChannel::new(Arc::clone(&sender));
-        let sensor_channel = SensorChannel::new(Arc::clone(&sender));
-        let video_channel = VideoChannel::new(Arc::clone(&sender), buffer_sender);
-        let input_channel = InputChannel::new(Arc::clone(&sender));
-        let audio_channel = AudioChannel::new(Arc::clone(&sender));
-        let audio1_channel = Audio1Channel::new(Arc::clone(&sender));
-        let audio2_channel = Audio2Channel::new(Arc::clone(&sender));
-        let microphone_channel = MicrophoneChannel::new(Arc::clone(&sender));
-        let media_play_back_channel = MediaPlayBackChannel::new(Arc::clone(&sender));
+        let control_channel = ThreadChannel::new(ControlService::new());
+        let sensor_channel = ThreadChannel::new(SensorService::new());
+        let video_channel = ThreadChannel::new(VideoService::new(buffer_sender));
+        let input_channel = ThreadChannel::new(InputService::new());
+        let audio_channel = ThreadChannel::new(AudioService::new());
+        let audio1_channel = ThreadChannel::new(AudioService::new());
+        let audio2_channel = ThreadChannel::new(AudioService::new());
+        let microphone_channel = ThreadChannel::new(MicrophoneService::new());
+        let media_play_back_channel = ThreadChannel::new(MediaPlayBackService::new());
 
         AapConnection {
             tls_stream: stream,
@@ -60,7 +54,6 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
             audio2_channel,
             microphone_channel,
             media_play_back_channel,
-            receiver: Arc::new(Mutex::new(receiver)),
             key_event_receiver,
             _phantom: PhantomData,
         }
@@ -111,7 +104,7 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
     fn start_loop(&mut self) {
         println!("Start Loop");
 
-        self.control_channel.start();
+        self.control_channel.open();
 
         loop {
             let key_event = self.key_event_receiver.try_recv();
@@ -125,22 +118,20 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
                 }
             }
 
-            let channel_message = self.receiver.lock().unwrap().try_recv();
+            let mut messages = vec![];
 
-            match channel_message {
-                Ok(msg) => {
-                    if msg.channel == 3 && msg.msg_type == InputMessageType::InputReport as u16 {
-                        println!("Input Report");
-                    } else if msg.channel == 3 && msg.msg_type == InputMessageType::BindingResponse as u16 {
-                        println!("Binding Response");
-                    }
+            messages.append(&mut self.control_channel.messages_to_send());
+            messages.append(&mut self.sensor_channel.messages_to_send());
+            messages.append(&mut self.video_channel.messages_to_send());
+            messages.append(&mut self.input_channel.messages_to_send());
+            messages.append(&mut self.audio1_channel.messages_to_send());
+            messages.append(&mut self.audio2_channel.messages_to_send());
+            messages.append(&mut self.audio_channel.messages_to_send());
+            messages.append(&mut self.microphone_channel.messages_to_send());
+            messages.append(&mut self.media_play_back_channel.messages_to_send());
 
-                    self.write_message(msg, true).unwrap();
-                }
-                Err(TryRecvError::Empty) => {}
-                Err(TryRecvError::Disconnected) => {
-                    todo!("Channel Disconnected")
-                }
+            for message in messages {
+                self.write_message(message, true).unwrap();
             }
 
 
@@ -150,14 +141,14 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
             if let Some(message) = message {
                 if message.msg_type == ControlMessageType::ChannelOpenRequest as u16 {
                     match message.channel {
-                        1 => self.sensor_channel.start(),
-                        2 => self.video_channel.start(),
-                        3 => self.input_channel.start(),
-                        4 => self.audio1_channel.start(),
-                        5 => self.audio2_channel.start(),
-                        6 => self.audio_channel.start(),
-                        7 => self.microphone_channel.start(),
-                        9 => self.media_play_back_channel.start(),
+                        1 => self.sensor_channel.open(),
+                        2 => self.video_channel.open(),
+                        3 => self.input_channel.open(),
+                        4 => self.audio1_channel.open(),
+                        5 => self.audio2_channel.open(),
+                        6 => self.audio_channel.open(),
+                        7 => self.microphone_channel.open(),
+                        9 => self.media_play_back_channel.open(),
                         _ => {
                             println!("Unsupported Channel: {}", message.channel);
                         }
@@ -167,15 +158,15 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
                     self.write_message(return_msg, true).unwrap();
                 } else {
                     match message.channel {
-                        0 => self.control_channel.send_message(message),
-                        1 => self.sensor_channel.send_message(message),
-                        2 => self.video_channel.send_message(message),
-                        3 => self.input_channel.send_message(message),
-                        4 => self.audio1_channel.send_message(message),
-                        5 => self.audio2_channel.send_message(message),
-                        6 => self.audio_channel.send_message(message),
-                        7 => self.microphone_channel.send_message(message),
-                        9 => self.media_play_back_channel.send_message(message),
+                        0 => self.control_channel.send_message_to_channel(message),
+                        1 => self.sensor_channel.send_message_to_channel(message),
+                        2 => self.video_channel.send_message_to_channel(message),
+                        3 => self.input_channel.send_message_to_channel(message),
+                        4 => self.audio1_channel.send_message_to_channel(message),
+                        5 => self.audio2_channel.send_message_to_channel(message),
+                        6 => self.audio_channel.send_message_to_channel(message),
+                        7 => self.microphone_channel.send_message_to_channel(message),
+                        9 => self.media_play_back_channel.send_message_to_channel(message),
                         _ => {
                             println!("Unsupported Channel: {}", message.channel);
                         }
@@ -205,6 +196,6 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
     }
     
     pub fn send_key_event(&mut self, keycode: u32, down: bool) {
-        self.input_channel.send_key_event(keycode, down);
+        //self.input_channel.send_key_event(keycode, down);
     }
 }
