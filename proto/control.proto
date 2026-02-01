@@ -32,6 +32,12 @@ message Service
                 _800x480 = 1;
                 _1280x720 = 2;
                 _1920x1080 = 3;
+                _2560x1440 = 4;
+                _3840x2160 = 5;
+                _720x1280 = 6;
+                _1080x1920 = 7;
+                _1440x2560 = 8;
+                _2160x3840 = 9;
             }
 
             enum VideoFrameRateType
@@ -47,11 +53,19 @@ message Service
             optional uint32 decoder_additional_depth = 6;
         }
 
+        enum DisplayType {
+            Main = 0;
+            Cluster = 1;
+            Auxiliary = 2;
+        }
+
         required MediaCodecType available_type = 1;
         optional AudioStreamType audio_type = 2;
         repeated AudioConfiguration audio_configs = 3;
         repeated VideoConfiguration video_configs = 4;
         optional bool available_while_in_call = 5;
+        optional uint32 display_id = 6;
+        optional DisplayType display_type = 7;
     }
 
     message InputSourceService
@@ -158,6 +172,9 @@ message Service
 
 message ServiceDiscoveryRequest
 {
+    optional bytes icon_small = 1;
+    optional bytes icon_medium = 2;
+    optional bytes icon_large = 3;
     required string phone_name = 4;
     required string phone_brand = 5;
 }

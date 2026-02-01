@@ -7,9 +7,6 @@ pub mod sensor;
 pub mod video;
 
 use crate::message::Message;
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{Arc, Mutex, mpsc};
-use std::thread;
 
 pub trait Service {
     fn handle_message(&mut self, message: Message);

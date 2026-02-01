@@ -1,12 +1,12 @@
 use crate::message::{InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
-use crate::protobuf::input::KeyBindingRequest;
 use crate::protobuf::input;
+use crate::protobuf::input::KeyBindingRequest;
 use crate::service::Service;
 use protobuf::Message as ProtoMessage;
 
 pub struct InputService {
-    messages: Vec<Message>
+    messages: Vec<Message>,
 }
 
 impl InputService {
@@ -30,37 +30,6 @@ impl InputService {
             InputMessageType::BindingResponse as u16
         ))
     }
-
-    /*pub fn send_key_event(&mut self, keycode: u32, down: bool) {
-        let mut key = input::Key::new();
-        key.down = Some(down);
-        key.keycode = Some(keycode);
-
-        let mut key_event = input::KeyEvent::new();
-        key_event.keys.push(key);
-
-        let mut report = input::InputReport::new();
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-
-        report.set_timestamp(ts);
-        report.key_event = MessageField::from_option(Some(key_event));
-
-        println!("Send InputReport(Event): {:#?}", report);
-
-        self.get_out_sender()
-            .lock()
-            .unwrap()
-            .send(Message::new_with_protobuf_message(
-                3,
-                false,
-                report,
-                InputMessageType::InputReport as u16
-            ))
-            .unwrap();
-    }*/
 }
 
 impl Service for InputService {

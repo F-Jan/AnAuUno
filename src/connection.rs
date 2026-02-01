@@ -1,4 +1,4 @@
-use crate::message::{ControlMessageType, Message};
+use crate::message::{ControlMessageType, InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::service::audio::AudioService;
@@ -15,6 +15,7 @@ use protobuf::Message as ProtobufMessage;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use crate::channel::Channel;
 use crate::channel::thread::ThreadChannel;
+use crate::protobuf::input;
 
 pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
     tls_stream: T,
@@ -196,6 +197,30 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
     }
     
     pub fn send_key_event(&mut self, keycode: u32, down: bool) {
-        //self.input_channel.send_key_event(keycode, down);
+        let mut key = input::Key::new();
+        key.down = Some(down);
+        key.keycode = Some(keycode);
+        key.metastate = Some(0);
+
+        let mut key_event = input::KeyEvent::new();
+        key_event.keys.push(key);
+
+        let mut report = input::InputReport::new();
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        report.set_timestamp(ts);
+        report.key_event = Some(key_event).into();
+
+        println!("Send InputReport(Event): {:#?}", report);
+
+        self.write_message(Message::new_with_protobuf_message(
+            3,
+            false,
+            report,
+            InputMessageType::InputReport as u16
+        ), true).unwrap();
     }
 }
