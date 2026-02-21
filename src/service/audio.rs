@@ -1,4 +1,6 @@
+use std::sync::{Arc, Mutex};
 use protobuf::Message as ProtoMessage;
+use crate::connection::ConnectionContext;
 use crate::message::{MediaMessageType, Message};
 use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
@@ -6,13 +8,13 @@ use crate::protobuf::media::MediaSetupRequest;
 use crate::service::ServiceHandler;
 
 pub struct AudioService {
-    messages: Vec<Message>
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl AudioService {
-    pub fn new() -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
-            messages: vec![]
+            context,
         }
     }
 
@@ -26,12 +28,15 @@ impl AudioService {
             config.set_max_unacked(1);
             config.configuration_indices.push(0u32);
 
-            self.send_message(Message::new_with_protobuf_message(
+            let context = Arc::clone(&self.context);
+            let mut context = context.lock().unwrap();
+
+            context.commands().send_message(Message::new_with_protobuf_message(
                 message.channel,
                 false,
                 config,
                 MediaMessageType::ConfigResponse as u16
-            ));
+            ), true);
         }
     }
 }
@@ -46,9 +51,5 @@ impl ServiceHandler for AudioService {
                 println!("Unsupported AudioChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
-    }
-
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
-        &mut self.messages
     }
 }

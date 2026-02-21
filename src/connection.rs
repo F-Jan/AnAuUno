@@ -18,12 +18,14 @@ use core::marker::PhantomData;
 use protobuf::Message as ProtobufMessage;
 use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 
 pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
     tls_stream: T,
     services: Vec<Box<dyn Channel>>,
     key_event_receiver: Receiver<(u32, bool)>,
+    context: Arc<Mutex<ConnectionContext>>,
     _phantom: PhantomData<S>,
 }
 
@@ -33,21 +35,24 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
         buffer_sender: Sender<Vec<u8>>,
         key_event_receiver: Receiver<(u32, bool)>,
     ) -> Self {
+        let context = Arc::new(Mutex::new(ConnectionContext::new()));
+
         AapConnection {
             tls_stream: stream,
             services: vec![],
             key_event_receiver,
+            context: Arc::clone(&context),
             _phantom: PhantomData,
         }
-        .add_service(ThreadChannel::new(ControlService::new()))
-        .add_service(ThreadChannel::new(SensorService::new()))
-        .add_service(ThreadChannel::new(VideoService::new(buffer_sender)))
-        .add_service(ThreadChannel::new(InputService::new()))
-        .add_service(ThreadChannel::new(AudioService::new()))
-        .add_service(ThreadChannel::new(AudioService::new()))
-        .add_service(ThreadChannel::new(AudioService::new()))
-        .add_service(ThreadChannel::new(MicrophoneService::new()))
-        .add_service(ThreadChannel::new(MediaPlayBackService::new()))
+        .add_service(ThreadChannel::new(ControlService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(SensorService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(VideoService::new(buffer_sender, Arc::clone(&context))))
+        .add_service(ThreadChannel::new(InputService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(MicrophoneService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(MediaPlayBackService::new(Arc::clone(&context))))
     }
 
     pub fn start(&mut self) {
@@ -117,14 +122,21 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
                 }
             }
 
-            let mut messages = vec![];
 
-            for service in &mut self.services {
-                messages.append(&mut service.messages_to_send());
+            let context = Arc::clone(&self.context);
+            let mut context = context.lock().unwrap();
+
+            let messages = context.commands().messages_to_send();
+
+            if messages.len() > 0 {
+                println!("Send {} Messages", messages.len());
             }
 
+            drop(context);
+
+
             for message in messages {
-                self.write_message(message, true).unwrap();
+                self.write_message(message.0, message.1).unwrap();
             }
 
             // Receive
@@ -215,18 +227,46 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
     }
 }
 
+pub struct Commands {
+    // (message, encrypted)
+    queue: Vec<(Message, bool)>,
+}
+
+impl Commands {
+    pub fn new() -> Self {
+        Self {
+            queue: vec![],
+        }
+    }
+
+    pub fn send_message(&mut self, message: Message, encrypted: bool) {
+        self.queue.push((message, encrypted));
+    }
+
+    pub fn messages_to_send(&mut self) -> Vec<(Message, bool)> {
+        let messages = core::mem::replace(&mut self.queue, vec![]);
+        messages
+    }
+}
+
 pub struct ConnectionContext {
-    app_data: BTreeMap<TypeId, Box<dyn Any>>,
+    app_data: BTreeMap<TypeId, Box<dyn Any + Send + Sync>>,
+    commands: Commands,
 }
 
 impl ConnectionContext {
     pub fn new() -> Self {
         Self {
             app_data: BTreeMap::new(),
+            commands: Commands::new(),
         }
     }
 
-    pub fn app_data<T: Any>(&mut self, data: Data<T>) {
+    pub fn app_data<T: Any + Send + Sync>(&mut self, data: Data<T>) {
         self.app_data.insert(TypeId::of::<T>(), Box::new(data));
+    }
+
+    pub fn commands(&mut self) -> &mut Commands {
+        &mut self.commands
     }
 }

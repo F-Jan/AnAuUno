@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use crate::message::{Message, SensorsMessageType};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::sensors::sensor_batch::{driving_status_data, DrivingStatusData};
@@ -5,15 +6,16 @@ use crate::protobuf::sensors::SensorRequest;
 use crate::protobuf::sensors;
 use crate::service::ServiceHandler;
 use protobuf::Message as ProtoMessage;
+use crate::connection::ConnectionContext;
 
 pub struct SensorService {
-    messages: Vec<Message>
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl SensorService {
-    pub fn new() -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
-            messages: vec![]
+            context,
         }
     }
 
@@ -25,12 +27,15 @@ impl SensorService {
         let mut config = sensors::SensorResponse::new();
         config.set_status(MessageStatus::Ok);
 
-        self.send_message(Message::new_with_protobuf_message(
+        let context = Arc::clone(&self.context);
+        let mut context = context.lock().unwrap();
+
+        context.commands().send_message(Message::new_with_protobuf_message(
             message.channel,
             false,
             config,
             SensorsMessageType::StartResponse as u16
-        ));
+        ), true);
 
 
         let mut config = sensors::SensorBatch::new();
@@ -38,12 +43,12 @@ impl SensorService {
         driving_status_data.set_status(driving_status_data::Status::Unrestricted as i32);
         config.driving_status.push(driving_status_data);
 
-        self.send_message(Message::new_with_protobuf_message(
+        context.commands().send_message(Message::new_with_protobuf_message(
             message.channel,
             false,
             config,
             SensorsMessageType::Event as u16
-        ));
+        ), true);
     }
 }
 
@@ -57,9 +62,5 @@ impl ServiceHandler for SensorService {
                 println!("Unsupported SensorChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
-    }
-
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
-        &mut self.messages
     }
 }

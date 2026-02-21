@@ -1,5 +1,7 @@
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use protobuf::Message as ProtoMessage;
+use crate::connection::ConnectionContext;
 use crate::message::{MediaMessageType, Message};
 use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
@@ -7,19 +9,19 @@ use crate::protobuf::media::{MediaSetupRequest, VideoFocusMode, VideoFocusReques
 use crate::service::ServiceHandler;
 
 pub struct VideoService {
-    messages: Vec<Message>,
     session_id: Option<i32>,
     pub buffer_sender: Sender<Vec<u8>>,
     pub infos: Vec<u8>,
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl VideoService {
-    pub fn new(buffer_sender: Sender<Vec<u8>>) -> Self {
+    pub fn new(buffer_sender: Sender<Vec<u8>>, context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
-            messages: vec![],
             session_id: None,
             buffer_sender,
             infos: vec![],
+            context,
         }
     }
 
@@ -33,12 +35,15 @@ impl VideoService {
             config.set_max_unacked(1);
             config.configuration_indices.push(0u32);
 
-            self.send_message(Message::new_with_protobuf_message(
+            let context = Arc::clone(&self.context);
+            let mut context = context.lock().unwrap();
+
+            context.commands().send_message(Message::new_with_protobuf_message(
                 message.channel,
                 false,
                 config,
                 MediaMessageType::ConfigResponse as u16
-            ));
+            ), true);
 
 
 
@@ -46,12 +51,12 @@ impl VideoService {
             notification.set_mode(VideoFocusMode::Focused);
             notification.set_unsolicited(false);
 
-            self.send_message(Message::new_with_protobuf_message(
+            context.commands().send_message(Message::new_with_protobuf_message(
                 message.channel,
                 false,
                 notification,
                 MediaMessageType::VideoFocusNotification as u16
-            ));
+            ), true);
         }
     }
 
@@ -62,12 +67,15 @@ impl VideoService {
         config.set_mode(VideoFocusMode::Focused);
         config.set_unsolicited(false);
 
-        self.send_message(Message::new_with_protobuf_message(
+        let context = Arc::clone(&self.context);
+        let mut context = context.lock().unwrap();
+        
+        context.commands().send_message(Message::new_with_protobuf_message(
             message.channel,
             false,
             config,
             MediaMessageType::VideoFocusNotification as u16
-        ));
+        ), true);
     }
 
     pub fn handle_media_start_request(&mut self, message: Message) {
@@ -84,12 +92,15 @@ impl VideoService {
             ack.set_session_id(self.session_id.unwrap());
             ack.set_ack(1);
 
-            self.send_message(Message::new_with_protobuf_message(
+            let context = Arc::clone(&self.context);
+            let mut context = context.lock().unwrap();
+            
+            context.commands().send_message(Message::new_with_protobuf_message(
                 2,
                 false,
                 ack,
                 MediaMessageType::Ack as u16
-            ));
+            ), true);
         }
     }
 }
@@ -127,9 +138,5 @@ impl ServiceHandler for VideoService {
                 println!("Unsupported VideoChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
-    }
-
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
-        &mut self.messages
     }
 }

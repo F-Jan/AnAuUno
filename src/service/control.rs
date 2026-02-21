@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use crate::message::{ControlMessageType, Message};
 use crate::protobuf::control::audio_focus_notification::AudioFocusStateType;
 use crate::protobuf::control::audio_focus_request_notification::AudioFocusRequestType;
@@ -11,15 +12,16 @@ use crate::protobuf::media::{AudioConfiguration, AudioStreamType, MediaCodecType
 use crate::protobuf::sensors::SensorType;
 use crate::service::ServiceHandler;
 use protobuf::{Enum, Message as ProtoMessage};
+use crate::connection::ConnectionContext;
 
 pub struct ControlService {
-    messages: Vec<Message>
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl ControlService {
-    pub fn new() -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
-            messages: vec![]
+            context,
         }
     }
 
@@ -41,12 +43,15 @@ impl ControlService {
         let mut notification = AudioFocusNotification::new();
         notification.set_focus_state(audio_focus_state_type);
 
-        self.send_message(Message::new_with_protobuf_message(
+        let context = Arc::clone(&self.context);
+        let mut context = context.lock().unwrap();
+
+        context.commands().send_message(Message::new_with_protobuf_message(
             0,
             false,
             notification,
             ControlMessageType::AudioFocusNotification as u16
-        ));
+        ), true);
     }
 
     fn handle_service_discovery_request(&mut self, message: Message) {
@@ -209,12 +214,15 @@ impl ControlService {
 
         //println!("{:#?}", res);
 
-        self.send_message(Message::new_with_protobuf_message(
+        let context = Arc::clone(&self.context);
+        let mut context = context.lock().unwrap();
+
+        context.commands().send_message(Message::new_with_protobuf_message(
             0,
             false,
             res,
             ControlMessageType::ServiceDiscoveryResponse as u16
-        ));
+        ), true);
     }
 }
 
@@ -237,9 +245,5 @@ impl ServiceHandler for ControlService {
         } else {
             println!("Unsupported : {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
         }
-    }
-
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
-        &mut self.messages
     }
 }

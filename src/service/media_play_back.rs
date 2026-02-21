@@ -1,18 +1,18 @@
-use protobuf::Message as ProtoMessage;
-use crate::message::{MediaMessageType, Message};
-use crate::protobuf::{media, playback};
-use crate::protobuf::media::config::ConfigStatus;
-use crate::protobuf::media::MediaSetupRequest;
+use crate::connection::ConnectionContext;
+use crate::message::Message;
+use crate::protobuf::playback;
 use crate::service::ServiceHandler;
+use protobuf::Message as ProtoMessage;
+use std::sync::{Arc, Mutex};
 
 pub struct MediaPlayBackService {
-    messages: Vec<Message>
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl MediaPlayBackService {
-    pub fn new() -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
-            messages: vec![]
+            context,
         }
     }
 
@@ -41,9 +41,5 @@ impl ServiceHandler for MediaPlayBackService {
                 println!("Unsupported MediaPlayBackChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
-    }
-
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
-        &mut self.messages
     }
 }

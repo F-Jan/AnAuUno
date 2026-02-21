@@ -6,6 +6,8 @@ pub mod microphone;
 pub mod sensor;
 pub mod video;
 
+use std::sync::{Arc, Mutex};
+use crate::connection::ConnectionContext;
 use crate::data::{MessageRequest, ServiceMessageHandler, ServiceMessageHandlerArg};
 use crate::message::Message;
 
@@ -28,18 +30,8 @@ macro_rules! factory_add_handler (($func_name:ident, $handler_name:ident) => {
 pub trait ServiceHandler {
     fn handle_message(&mut self, message: Message);
 
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message>;
-
     fn on_channel_open(&mut self) {
         // TODO
-    }
-
-    fn send_message(&mut self, message: Message) {
-        self.get_messages_to_send_mut().push(message);
-    }
-
-    fn messages_to_send(&mut self) -> Vec<Message> {
-        self.get_messages_to_send_mut().drain(..).collect()
     }
 }
 

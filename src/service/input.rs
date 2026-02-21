@@ -1,18 +1,20 @@
+use std::sync::{Arc, Mutex};
 use crate::message::{InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::input;
 use crate::protobuf::input::KeyBindingRequest;
 use crate::service::ServiceHandler;
 use protobuf::Message as ProtoMessage;
+use crate::connection::ConnectionContext;
 
 pub struct InputService {
-    messages: Vec<Message>,
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl InputService {
-    pub fn new() -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
-            messages: vec![]
+            context,
         }
     }
 
@@ -23,12 +25,15 @@ impl InputService {
         let mut config = input::BindingResponse::new();
         config.set_status(MessageStatus::Ok);
 
-        self.send_message(Message::new_with_protobuf_message(
+        let context = Arc::clone(&self.context);
+        let mut context = context.lock().unwrap();
+
+        context.commands().send_message(Message::new_with_protobuf_message(
             message.channel,
             message.is_control,
             config,
             InputMessageType::BindingResponse as u16
-        ))
+        ), true)
     }
 }
 
@@ -42,9 +47,5 @@ impl ServiceHandler for InputService {
                 println!("Unsupported InputChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
             }
         }
-    }
-
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
-        &mut self.messages
     }
 }

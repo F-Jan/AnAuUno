@@ -1,14 +1,16 @@
+use std::sync::{Arc, Mutex};
+use crate::connection::ConnectionContext;
 use crate::message::Message;
 use crate::service::ServiceHandler;
 
 pub struct MicrophoneService {
-    messages: Vec<Message>
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl MicrophoneService {
-    pub fn new() -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
-            messages: vec![]
+            context,
         }
     }
 }
@@ -16,9 +18,5 @@ impl MicrophoneService {
 impl ServiceHandler for MicrophoneService {
     fn handle_message(&mut self, message: Message) {
         println!("Unsupported MicrophoneChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
-    }
-
-    fn get_messages_to_send_mut(&mut self) -> &mut Vec<Message> {
-        &mut self.messages
     }
 }
