@@ -1,5 +1,5 @@
 use crate::message::Message;
-use crate::service::Service;
+use crate::service::ServiceHandler;
 
 pub struct MicrophoneService {
     messages: Vec<Message>
@@ -13,7 +13,7 @@ impl MicrophoneService {
     }
 }
 
-impl Service for MicrophoneService {
+impl ServiceHandler for MicrophoneService {
     fn handle_message(&mut self, message: Message) {
         println!("Unsupported MicrophoneChannel: {} {} {} {} {}", message.channel, message.is_control, message.length, message.msg_type, hex::encode(&message.data));
     }

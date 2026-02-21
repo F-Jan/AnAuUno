@@ -9,7 +9,7 @@ use crate::protobuf::control::{AudioFocusNotification, AudioFocusRequestNotifica
 use crate::protobuf::input::KeyCode;
 use crate::protobuf::media::{AudioConfiguration, AudioStreamType, MediaCodecType};
 use crate::protobuf::sensors::SensorType;
-use crate::service::Service;
+use crate::service::ServiceHandler;
 use protobuf::{Enum, Message as ProtoMessage};
 
 pub struct ControlService {
@@ -185,7 +185,7 @@ impl ControlService {
 
         // Media Playback Status
         let mut service = crate::protobuf::control::Service::new();
-        service.id = Some(9);
+        service.id = Some(8);
 
         service.media_playback_service = Some(MediaPlaybackStatusService::new()).into();
 
@@ -218,7 +218,7 @@ impl ControlService {
     }
 }
 
-impl Service for ControlService {
+impl ServiceHandler for ControlService {
     fn handle_message(&mut self, message: Message) {
         let msg_type = ControlMessageType::from_u16(message.msg_type);
 

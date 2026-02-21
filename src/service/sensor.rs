@@ -3,7 +3,7 @@ use crate::protobuf::common::MessageStatus;
 use crate::protobuf::sensors::sensor_batch::{driving_status_data, DrivingStatusData};
 use crate::protobuf::sensors::SensorRequest;
 use crate::protobuf::sensors;
-use crate::service::Service;
+use crate::service::ServiceHandler;
 use protobuf::Message as ProtoMessage;
 
 pub struct SensorService {
@@ -47,7 +47,7 @@ impl SensorService {
     }
 }
 
-impl Service for SensorService {
+impl ServiceHandler for SensorService {
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { is_control: false, msg_type: 32769, .. } => { // SensorStartRequest

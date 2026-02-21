@@ -2,7 +2,7 @@ use crate::message::{InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::input;
 use crate::protobuf::input::KeyBindingRequest;
-use crate::service::Service;
+use crate::service::ServiceHandler;
 use protobuf::Message as ProtoMessage;
 
 pub struct InputService {
@@ -32,7 +32,7 @@ impl InputService {
     }
 }
 
-impl Service for InputService {
+impl ServiceHandler for InputService {
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { is_control: false, msg_type: 32770, .. } => { // BindingRequest

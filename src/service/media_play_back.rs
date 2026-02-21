@@ -3,7 +3,7 @@ use crate::message::{MediaMessageType, Message};
 use crate::protobuf::{media, playback};
 use crate::protobuf::media::config::ConfigStatus;
 use crate::protobuf::media::MediaSetupRequest;
-use crate::service::Service;
+use crate::service::ServiceHandler;
 
 pub struct MediaPlayBackService {
     messages: Vec<Message>
@@ -26,7 +26,7 @@ impl MediaPlayBackService {
     }
 }
 
-impl Service for MediaPlayBackService {
+impl ServiceHandler for MediaPlayBackService {
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { msg_type: 32769, .. } => { // MEDIA_PLAYBACK_STATUS

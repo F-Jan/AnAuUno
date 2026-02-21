@@ -4,7 +4,7 @@ use crate::message::{MediaMessageType, Message};
 use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
 use crate::protobuf::media::{MediaSetupRequest, VideoFocusMode, VideoFocusRequestNotification};
-use crate::service::Service;
+use crate::service::ServiceHandler;
 
 pub struct VideoService {
     messages: Vec<Message>,
@@ -94,7 +94,7 @@ impl VideoService {
     }
 }
 
-impl Service for VideoService {
+impl ServiceHandler for VideoService {
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { msg_type: 32768, .. } => { // SetupRequest

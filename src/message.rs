@@ -2,6 +2,7 @@ use crate::frame::{FrameHeader, FrameType};
 use crate::stream::AapSteam;
 use crate::tls::TlsStream;
 
+#[derive(Clone)]
 pub struct Message {
     pub channel: u8,
     pub is_control: bool,

@@ -3,9 +3,9 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use crate::channel::Channel;
 use crate::message::Message;
-use crate::service::Service;
+use crate::service::ServiceHandler;
 
-pub struct ThreadChannel<S: Service + Send> {
+pub struct ThreadChannel<S: ServiceHandler + Send> {
     service: Arc<Mutex<S>>,
 
     // Message to the Channel
@@ -17,8 +17,8 @@ pub struct ThreadChannel<S: Service + Send> {
     message_out_sender: Arc<Mutex<Sender<Message>>>,
 }
 
-impl<S: Service + Send + 'static> Channel<S> for ThreadChannel<S> {
-    fn new(service: S) -> Self {
+impl<S: ServiceHandler + Send> ThreadChannel<S> {
+    pub(crate) fn new(service: S) -> Self {
         let (message_in_sender, message_in_receiver) = mpsc::channel::<Message>();
         let (message_out_sender, message_out_receiver) = mpsc::channel::<Message>();
 
@@ -30,6 +30,9 @@ impl<S: Service + Send + 'static> Channel<S> for ThreadChannel<S> {
             message_out_sender: Arc::new(Mutex::new(message_out_sender)),
         }
     }
+}
+
+impl<S: ServiceHandler + Send + 'static> Channel for ThreadChannel<S> {
 
     fn send_message_to_channel(&self, message: Message) {
         self.message_in_sender.send(message).unwrap();
@@ -66,6 +69,8 @@ impl<S: Service + Send + 'static> Channel<S> for ThreadChannel<S> {
                 for message in messages {
                     message_out_sender.send(message).unwrap();
                 }
+
+                thread::sleep(std::time::Duration::from_millis(10));
             }
         });
     }

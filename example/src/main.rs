@@ -11,6 +11,9 @@ use winit::event::{KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window};
+use anauuno::data::Data;
+use anauuno::message::Message;
+use anauuno::service::{MediaSinkService, MediaServiceConfig};
 use anauuno::tls::openssl::OpenSSLTlsStream;
 
 // AOA‑Setup‑Requests
@@ -370,6 +373,10 @@ impl Hotplug<Context> for USBHandler {
     fn device_left(&mut self, _device: Device<Context>) {}
 }
 
+fn media_data_handler(data: Data<u32>, message: Message) {
+    
+}
+
 fn main() -> rusb::Result<()> {
     let context = Context::new()?;
     // Hier Vendor und Product ID des normalen Android-Geräts (OEM‑IDs) einsetzen
@@ -442,6 +449,8 @@ fn main() -> rusb::Result<()> {
         pipeline.set_state(gstreamer::State::Null).ok();
     });
 
+    let mut media_service = MediaSinkService::new(MediaServiceConfig {});
+    media_service.add_media_data_handler(media_data_handler);
 
     thread::spawn(move || {
         connection.start();

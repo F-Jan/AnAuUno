@@ -3,7 +3,7 @@ use crate::message::{MediaMessageType, Message};
 use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
 use crate::protobuf::media::MediaSetupRequest;
-use crate::service::Service;
+use crate::service::ServiceHandler;
 
 pub struct AudioService {
     messages: Vec<Message>
@@ -36,7 +36,7 @@ impl AudioService {
     }
 }
 
-impl Service for AudioService {
+impl ServiceHandler for AudioService {
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { is_control: false, msg_type: 32768, .. } => { // SetupRequest

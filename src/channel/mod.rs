@@ -1,11 +1,8 @@
 pub mod thread;
 
 use crate::message::Message;
-use crate::service::Service;
 
-pub trait Channel<S: Service> {
-    fn new(service: S) -> Self;
-
+pub trait Channel: Send {
     fn send_message_to_channel(&self, message: Message);
 
     fn open(&mut self);
