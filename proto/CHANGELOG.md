@@ -3,6 +3,9 @@
 The original files come from https://github.com/anod/headunit; 
 this file documents the changes made to the protobuf files.
 
+# 2026-02-24 (F-Jan)
+- Renamed KeycodeDpad[...] to KeycodeDPad[...]
+
 # 2026-02-01 (F-Jan)
 - Added more VideoResolutions
 - Added the DisplayType enum

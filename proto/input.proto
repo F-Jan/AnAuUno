@@ -348,10 +348,10 @@ enum KeyCode {
     KeycodeNavigateNext = 261;
     KeycodeNavigateIn = 262;
     KeycodeNavigateOut = 263;
-    KeycodeDpadUpLeft = 268;
-    KeycodeDpadDownLeft = 269;
-    KeycodeDpadUpRight = 270;
-    KeycodeDpadDownRight = 271;
+    KeycodeDPadUpLeft = 268;
+    KeycodeDPadDownLeft = 269;
+    KeycodeDPadUpRight = 270;
+    KeycodeDPadDownRight = 271;
     KeycodeSentinel = 65535;
     KeycodeRotaryController = 65536;
     KeycodeMedia = 65537;
