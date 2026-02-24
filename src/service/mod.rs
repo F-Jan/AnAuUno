@@ -6,8 +6,6 @@ pub mod microphone;
 pub mod sensor;
 pub mod video;
 
-use std::sync::{Arc, Mutex};
-use crate::connection::ConnectionContext;
 use crate::data::{MessageRequest, ServiceMessageHandler, ServiceMessageHandlerArg};
 use crate::message::Message;
 

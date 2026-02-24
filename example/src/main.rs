@@ -1,6 +1,6 @@
-use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender};
-use anauuno::connection::AapConnection;
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
+use anauuno::connection::{AapConnection, ConnectionContext};
 use anauuno::stream::UsbAapStream;
 use gstreamer::prelude::*;
 use gstreamer_app::AppSrc;
@@ -46,13 +46,13 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     window: Arc<Window>,
-    key_event_sender: Sender<(u32, bool)>
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl State {
     // We don't need this to be async right now,
     // but we will in the next tutorial
-    pub async fn new(window: Arc<Window>, key_event_sender: Sender<(u32, bool)>) -> anyhow::Result<Self> {
+    pub async fn new(window: Arc<Window>, context: Arc<Mutex<ConnectionContext>>) -> anyhow::Result<Self> {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -109,7 +109,7 @@ impl State {
             config,
             is_surface_configured: false,
             window,
-            key_event_sender,
+            context,
         })
     }
 
@@ -170,19 +170,47 @@ impl State {
     }
 
     fn handle_key(&self, event_loop: &ActiveEventLoop, code: KeyCode, is_pressed: bool) {
+
         let key_code_id = match code {
+            KeyCode::KeyH => 3,
+            KeyCode::KeyB => 4,
+
+            KeyCode::ArrowUp => 19,
             KeyCode::ArrowDown => 20,
             KeyCode::ArrowLeft => 21,
             KeyCode::ArrowRight => 22,
-            KeyCode::ArrowUp => 19,
             KeyCode::Enter => 23,
+
+            KeyCode::Digit1 => {
+                if is_pressed {
+                    let context = Arc::clone(&self.context);
+                    let mut context = context.lock().unwrap();
+
+                    context.commands().send_rotary_event(-1);
+                }
+
+                0
+            },
+            KeyCode::Digit2 => {
+                if is_pressed {
+                    let context = Arc::clone(&self.context);
+                    let mut context = context.lock().unwrap();
+
+                    context.commands().send_rotary_event(1);
+                }
+
+                0
+            },
             _ => 0,
         };
 
         if key_code_id != 0 {
-            println!("Key {:?} pressed: {}", code, is_pressed);
+            //println!("Key {:?} pressed: {}", code, is_pressed);
 
-            self.key_event_sender.send((key_code_id, is_pressed)).unwrap();
+            let context = Arc::clone(&self.context);
+            let mut context = context.lock().unwrap();
+
+            context.commands().send_key_event(key_code_id, is_pressed);
         }
 
         match (code, is_pressed) {
@@ -198,14 +226,14 @@ impl State {
 
 pub struct App {
     state: Option<State>,
-    key_event_sender: Sender<(u32, bool)>
+    context: Arc<Mutex<ConnectionContext>>,
 }
 
 impl App {
-    pub fn new(key_event_sender: Sender<(u32, bool)>) -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
         Self {
             state: None,
-            key_event_sender,
+            context,
         }
     }
 }
@@ -217,7 +245,7 @@ impl ApplicationHandler<State> for App {
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
-        self.state = Some(pollster::block_on(State::new(window, self.key_event_sender.clone())).unwrap());
+        self.state = Some(pollster::block_on(State::new(window, Arc::clone(&self.context))).unwrap());
     }
 
     #[allow(unused_mut)]
@@ -407,11 +435,12 @@ fn main() -> rusb::Result<()> {
     let handle = receiver.recv().unwrap();
 
     let (sender, receiver) = std::sync::mpsc::channel();
-    let (key_event_sender, key_event_receiver) = std::sync::mpsc::channel::<(u32, bool)>();
+    //let (key_event_sender, key_event_receiver) = std::sync::mpsc::channel::<(u32, bool)>();
+    let context = Arc::new(Mutex::new(ConnectionContext::new()));
 
     let stream = UsbAapStream::new(handle, 0x81, 0x01);
     let stream = OpenSSLTlsStream::new(stream);
-    let mut connection = AapConnection::new(stream, sender, key_event_receiver);
+    let mut connection = AapConnection::new(stream, sender, Arc::clone(&context));
 
     thread::spawn(move || {
         gstreamer::init().expect("GStreamer could not be initialized");
@@ -458,7 +487,7 @@ fn main() -> rusb::Result<()> {
 
 
     let event_loop = EventLoop::with_user_event().build().unwrap();
-    let mut app = App::new(key_event_sender);
+    let mut app = App::new(context);
 
     event_loop.run_app(&mut app).unwrap();
 

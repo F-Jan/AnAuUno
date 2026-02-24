@@ -107,7 +107,10 @@ impl ControlService {
         input_source.keycodes_supported.push(KeyCode::KeycodeDPadDown as u32);
         input_source.keycodes_supported.push(KeyCode::KeycodeDPadLeft as u32);
         input_source.keycodes_supported.push(KeyCode::KeycodeDPadRight as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeRotaryController as u32);
         input_source.keycodes_supported.push(KeyCode::KeycodeDPadCenter as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeHome as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeBack as u32);
 
         service.input_source_service = Some(input_source).into();
 

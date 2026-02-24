@@ -5,6 +5,7 @@ use crate::message::{ControlMessageType, InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::protobuf::input;
+use crate::protobuf::input::KeyCode;
 use crate::service::audio::AudioService;
 use crate::service::control::ControlService;
 use crate::service::input::InputService;
@@ -24,7 +25,6 @@ use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
     tls_stream: T,
     services: Vec<Box<dyn Channel>>,
-    key_event_receiver: Receiver<(u32, bool)>,
     context: Arc<Mutex<ConnectionContext>>,
     _phantom: PhantomData<S>,
 }
@@ -33,14 +33,11 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
     pub fn new(
         stream: T,
         buffer_sender: Sender<Vec<u8>>,
-        key_event_receiver: Receiver<(u32, bool)>,
+        context: Arc<Mutex<ConnectionContext>>,
     ) -> Self {
-        let context = Arc::new(Mutex::new(ConnectionContext::new()));
-
         AapConnection {
             tls_stream: stream,
             services: vec![],
-            key_event_receiver,
             context: Arc::clone(&context),
             _phantom: PhantomData,
         }
@@ -74,7 +71,7 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
         while version_message.is_none() {
             version_message = self.read_message().unwrap();
         }
-        //println!("{}", hex::encode(version_message.data));
+        //println!("{}", hex::encode(version_message.unwrap().data));
 
         // Do the TLS-Handshake
         self.tls_stream.do_handshake().unwrap();
@@ -111,33 +108,17 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
         self.get_channel(0).unwrap().open();
 
         loop {
-            let key_event = self.key_event_receiver.try_recv();
-            match key_event {
-                Ok((keycode, down)) => {
-                    self.send_key_event(keycode, down);
-                }
-                Err(TryRecvError::Empty) => {}
-                Err(TryRecvError::Disconnected) => {
-                    todo!("Channel Disconnected")
-                }
-            }
-
-
             let context = Arc::clone(&self.context);
             let mut context = context.lock().unwrap();
 
             let messages = context.commands().messages_to_send();
 
-            if messages.len() > 0 {
-                println!("Send {} Messages", messages.len());
-            }
-
             drop(context);
-
 
             for message in messages {
                 self.write_message(message.0, message.1).unwrap();
             }
+
 
             // Receive
             let message = self.read_message().unwrap();
@@ -193,38 +174,6 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
             ControlMessageType::ChannelOpenResponse as u16,
         )
     }
-
-    pub fn send_key_event(&mut self, keycode: u32, down: bool) {
-        let mut key = input::Key::new();
-        key.down = Some(down);
-        key.keycode = Some(keycode);
-        key.metastate = Some(0);
-
-        let mut key_event = input::KeyEvent::new();
-        key_event.keys.push(key);
-
-        let mut report = input::InputReport::new();
-        let ts = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
-
-        report.set_timestamp(ts);
-        report.key_event = Some(key_event).into();
-
-        println!("Send InputReport(Event): {:#?}", report);
-
-        self.write_message(
-            Message::new_with_protobuf_message(
-                3,
-                false,
-                report,
-                InputMessageType::InputReport as u16,
-            ),
-            true,
-        )
-        .unwrap();
-    }
 }
 
 pub struct Commands {
@@ -246,6 +195,64 @@ impl Commands {
     pub fn messages_to_send(&mut self) -> Vec<(Message, bool)> {
         let messages = core::mem::replace(&mut self.queue, vec![]);
         messages
+    }
+
+    pub fn send_rotary_event(&mut self, delta: i32) {
+        let mut rel = input::RelativeEvent_Rel::new();
+        rel.keycode = Some(KeyCode::KeycodeRotaryController as u32);
+        rel.delta = Some(delta);
+
+        let mut relative_event = input::RelativeEvent::new();
+        relative_event.data.push(rel);
+
+        let mut report = input::InputReport::new();
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        report.set_timestamp(ts);
+        report.relative_event = Some(relative_event).into();
+
+        self.send_message(
+            Message::new_with_protobuf_message(
+                3,
+                false,
+                report,
+                InputMessageType::InputReport as u16,
+            ),
+            true,
+        );
+    }
+
+    pub fn send_key_event(&mut self, keycode: u32, down: bool) {
+        let mut key = input::Key::new();
+        key.down = Some(down);
+        key.keycode = Some(keycode);
+        key.metastate = Some(0);
+        key.long_press = Some(false);
+
+        let mut key_event = input::KeyEvent::new();
+        key_event.keys.push(key);
+
+        let mut report = input::InputReport::new();
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+
+        report.set_timestamp(ts);
+        report.key_event = Some(key_event).into();
+
+        self.send_message(
+            Message::new_with_protobuf_message(
+                3,
+                false,
+                report,
+                InputMessageType::InputReport as u16,
+            ),
+            true,
+        );
     }
 }
 
