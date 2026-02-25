@@ -6,4 +6,6 @@ pub trait Channel: Send {
     fn send_message_to_channel(&self, message: Message);
 
     fn open(&mut self);
+
+    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service;
 }

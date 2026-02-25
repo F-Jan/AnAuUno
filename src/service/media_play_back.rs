@@ -1,9 +1,10 @@
 use crate::connection::ConnectionContext;
 use crate::message::Message;
 use crate::protobuf::playback;
-use crate::service::ServiceHandler;
+use crate::service::Service;
 use protobuf::Message as ProtoMessage;
 use std::sync::{Arc, Mutex};
+use crate::protobuf::control::service::MediaPlaybackStatusService;
 
 pub struct MediaPlayBackService {
     context: Arc<Mutex<ConnectionContext>>,
@@ -26,7 +27,16 @@ impl MediaPlayBackService {
     }
 }
 
-impl ServiceHandler for MediaPlayBackService {
+impl Service for MediaPlayBackService {
+    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service {
+        let mut service = crate::protobuf::control::Service::new();
+        service.id = Some(8);
+
+        service.media_playback_service = Some(MediaPlaybackStatusService::new()).into();
+
+        service
+    }
+
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { msg_type: 32769, .. } => { // MEDIA_PLAYBACK_STATUS

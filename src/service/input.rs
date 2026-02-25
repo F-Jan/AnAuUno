@@ -2,10 +2,11 @@ use std::sync::{Arc, Mutex};
 use crate::message::{InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::input;
-use crate::protobuf::input::KeyBindingRequest;
-use crate::service::ServiceHandler;
+use crate::protobuf::input::{KeyBindingRequest, KeyCode};
+use crate::service::Service;
 use protobuf::Message as ProtoMessage;
 use crate::connection::ConnectionContext;
+use crate::protobuf::control::service::InputSourceService;
 
 pub struct InputService {
     context: Arc<Mutex<ConnectionContext>>,
@@ -37,7 +38,31 @@ impl InputService {
     }
 }
 
-impl ServiceHandler for InputService {
+impl Service for InputService {
+    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service {
+        let mut service = crate::protobuf::control::Service::new();
+        service.id = Some(channel_id as u32);
+
+        /*let mut touch_config = TouchConfig::new();
+        touch_config.width = Some(800);
+        touch_config.height = Some(400);*/
+
+        let mut input_source = InputSourceService::new();
+        //input_source.touchscreen = Some(touch_config).into();
+        input_source.keycodes_supported.push(KeyCode::KeycodeDPadUp as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeDPadDown as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeDPadLeft as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeDPadRight as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeRotaryController as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeDPadCenter as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeHome as u32);
+        input_source.keycodes_supported.push(KeyCode::KeycodeBack as u32);
+
+        service.input_source_service = Some(input_source).into();
+        
+        service
+    }
+
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { is_control: false, msg_type: 32770, .. } => { // BindingRequest

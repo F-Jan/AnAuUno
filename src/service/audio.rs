@@ -2,10 +2,11 @@ use std::sync::{Arc, Mutex};
 use protobuf::Message as ProtoMessage;
 use crate::connection::ConnectionContext;
 use crate::message::{MediaMessageType, Message};
+use crate::protobuf::control::service::MediaSinkService;
 use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
-use crate::protobuf::media::MediaSetupRequest;
-use crate::service::ServiceHandler;
+use crate::protobuf::media::{AudioConfiguration, AudioStreamType, MediaCodecType, MediaSetupRequest};
+use crate::service::Service;
 
 pub struct AudioService {
     context: Arc<Mutex<ConnectionContext>>,
@@ -41,7 +42,34 @@ impl AudioService {
     }
 }
 
-impl ServiceHandler for AudioService {
+impl Service for AudioService {
+    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service {
+        let mut service = crate::protobuf::control::Service::new();
+        service.id = Some(channel_id as u32);
+
+        let (audio_type, number_of_channels, sample_rate) = match channel_id {
+            4 => (AudioStreamType::Speech, 1, 16000),
+            5 => (AudioStreamType::System, 1, 16000),
+            6 => (AudioStreamType::Media, 2, 48000),
+            _ => todo!("Error? Channel {} not supported", channel_id)
+        };
+        
+        let mut media_sink = MediaSinkService::new();
+        media_sink.set_available_type(MediaCodecType::MediaCodecAudioPCM);
+        media_sink.set_audio_type(audio_type);
+
+        let mut audio_config = AudioConfiguration::new();
+        audio_config.sample_rate = Some (sample_rate);
+        audio_config.number_of_bits = Some(16);
+        audio_config.number_of_channels = Some(number_of_channels);
+
+        media_sink.audio_configs.push(audio_config);
+
+        service.media_sink_service = Some(media_sink).into();
+        
+        service
+    }
+
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { is_control: false, msg_type: 32768, .. } => { // SetupRequest

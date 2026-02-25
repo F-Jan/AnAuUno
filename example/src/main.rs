@@ -13,7 +13,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window};
 use anauuno::data::Data;
 use anauuno::message::Message;
-use anauuno::service::{MediaSinkService, MediaServiceConfig};
+use anauuno::service::{MediaSinkService, MediaSinkServiceConfig};
 use anauuno::tls::openssl::OpenSSLTlsStream;
 
 // AOA‑Setup‑Requests
@@ -478,7 +478,7 @@ fn main() -> rusb::Result<()> {
         pipeline.set_state(gstreamer::State::Null).ok();
     });
 
-    let mut media_service = MediaSinkService::new(MediaServiceConfig {});
+    let mut media_service = MediaSinkService::new(MediaSinkServiceConfig {});
     media_service.add_media_data_handler(media_data_handler);
 
     thread::spawn(move || {

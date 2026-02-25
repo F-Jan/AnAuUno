@@ -25,7 +25,9 @@ macro_rules! factory_add_handler (($func_name:ident, $handler_name:ident) => {
     }
 });
 
-pub trait ServiceHandler {
+pub trait Service {
+    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service;
+
     fn handle_message(&mut self, message: Message);
 
     fn on_channel_open(&mut self) {
@@ -33,20 +35,16 @@ pub trait ServiceHandler {
     }
 }
 
-pub trait ServiceDescriptor {
-    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service;
-}
-
-pub struct MediaServiceConfig {}
+pub struct MediaSinkServiceConfig {}
 
 pub struct MediaSinkService {
-    config: MediaServiceConfig,
+    config: MediaSinkServiceConfig,
 
     media_data_handler: Option<Box<dyn Fn(MessageRequest)>>,
 }
 
 impl MediaSinkService {
-    pub fn new(config: MediaServiceConfig) -> Self {
+    pub fn new(config: MediaSinkServiceConfig) -> Self {
         Self {
             config,
             media_data_handler: None,
@@ -56,8 +54,21 @@ impl MediaSinkService {
     factory_add_handler!(add_media_data_handler, media_data_handler);
 }
 
-impl ServiceDescriptor for MediaSinkService {
+impl Service for MediaSinkService {
     fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service {
+        let mut service = crate::protobuf::control::Service::new();
+        service.id = Some(channel_id as u32);
+
+        let media_sink = crate::protobuf::control::service::MediaSinkService::new();
+
+        service
+    }
+
+    fn handle_message(&mut self, message: Message) {
+        todo!()
+    }
+
+    fn on_channel_open(&mut self) {
         todo!()
     }
 }

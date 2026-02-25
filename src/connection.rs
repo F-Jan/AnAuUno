@@ -1,5 +1,5 @@
-use crate::channel::Channel;
 use crate::channel::thread::ThreadChannel;
+use crate::channel::Channel;
 use crate::data::Data;
 use crate::message::{ControlMessageType, InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
@@ -16,11 +16,11 @@ use crate::service::video::VideoService;
 use crate::stream::AapSteam;
 use crate::tls::TlsStream;
 use core::marker::PhantomData;
+use core::any::{Any, TypeId};
 use protobuf::Message as ProtobufMessage;
-use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 
 pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
     tls_stream: T,
@@ -104,6 +104,22 @@ impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
 
     fn start_loop(&mut self) {
         println!("Start Loop");
+
+        let mut service_descriptors = vec![];
+        let mut counter = 0;
+        for service in &self.services {
+            if counter == 0 {
+                counter += 1;
+                continue;
+            }
+
+            service_descriptors.push(service.protobuf_descriptor(counter));
+            counter += 1;
+        }
+
+        let mut control_service = ControlService::new(Arc::clone(&self.context));
+        control_service.set_service_descriptors(service_descriptors);
+        self.services[0] = Box::new(ThreadChannel::new(control_service));
 
         self.get_channel(0).unwrap().open();
 

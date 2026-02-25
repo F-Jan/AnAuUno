@@ -2,11 +2,13 @@ use std::sync::{Arc, Mutex};
 use crate::message::{Message, SensorsMessageType};
 use crate::protobuf::common::MessageStatus;
 use crate::protobuf::sensors::sensor_batch::{driving_status_data, DrivingStatusData};
-use crate::protobuf::sensors::SensorRequest;
+use crate::protobuf::sensors::{SensorRequest, SensorType};
 use crate::protobuf::sensors;
-use crate::service::ServiceHandler;
+use crate::service::Service;
 use protobuf::Message as ProtoMessage;
 use crate::connection::ConnectionContext;
+use crate::protobuf::control::service::sensor_source_service::Sensor;
+use crate::protobuf::control::service::SensorSourceService;
 
 pub struct SensorService {
     context: Arc<Mutex<ConnectionContext>>,
@@ -52,7 +54,22 @@ impl SensorService {
     }
 }
 
-impl ServiceHandler for SensorService {
+impl Service for SensorService {
+    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service {
+        let mut service = crate::protobuf::control::Service::new();
+        service.id = Some(channel_id as u32);
+
+        let mut sensor = Sensor::new();
+        sensor.set_type(SensorType::DrivingStatus);
+
+        let mut sensor_source = SensorSourceService::new();
+        sensor_source.sensors.push(sensor);
+
+        service.sensor_source_service = Some(sensor_source).into();
+        
+        service
+    }
+
     fn handle_message(&mut self, message: Message) {
         match message {
             Message { is_control: false, msg_type: 32769, .. } => { // SensorStartRequest

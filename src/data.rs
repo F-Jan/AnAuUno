@@ -122,34 +122,3 @@ factory_tuple! { A B C D E F G H I J K L M }
 factory_tuple! { A B C D E F G H I J K L M N }
 factory_tuple! { A B C D E F G H I J K L M N O }
 factory_tuple! { A B C D E F G H I J K L M N O P }
-
-
-
-pub trait Service {
-
-    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service;
-
-}
-
-pub struct MediaSinkServiceConfig {}
-
-pub struct MediaSinkService {
-    config: MediaSinkServiceConfig,
-}
-
-impl MediaSinkService {
-    pub fn new(config: MediaSinkServiceConfig) -> Self {
-        Self { config }
-    }
-}
-
-impl Service for MediaSinkService {
-    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service {
-        let mut service = crate::protobuf::control::Service::new();
-        service.id = Some(channel_id as u32);
-
-        let media_sink = crate::protobuf::control::service::MediaSinkService::new();
-
-        service
-    }
-}

@@ -3,9 +3,9 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use crate::channel::Channel;
 use crate::message::Message;
-use crate::service::ServiceHandler;
+use crate::service::Service;
 
-pub struct ThreadChannel<S: ServiceHandler + Send> {
+pub struct ThreadChannel<S: Service + Send> {
     service: Arc<Mutex<S>>,
 
     // Message to the Channel
@@ -13,7 +13,7 @@ pub struct ThreadChannel<S: ServiceHandler + Send> {
     message_in_sender: Sender<Message>,
 }
 
-impl<S: ServiceHandler + Send> ThreadChannel<S> {
+impl<S: Service + Send> ThreadChannel<S> {
     pub(crate) fn new(service: S) -> Self {
         let (message_in_sender, message_in_receiver) = mpsc::channel::<Message>();
 
@@ -25,7 +25,7 @@ impl<S: ServiceHandler + Send> ThreadChannel<S> {
     }
 }
 
-impl<S: ServiceHandler + Send + 'static> Channel for ThreadChannel<S> {
+impl<S: Service + Send + 'static> Channel for ThreadChannel<S> {
 
     fn send_message_to_channel(&self, message: Message) {
         self.message_in_sender.send(message).unwrap();
@@ -56,5 +56,9 @@ impl<S: ServiceHandler + Send + 'static> Channel for ThreadChannel<S> {
                 }
             }
         });
+    }
+
+    fn protobuf_descriptor(&self, channel_id: u8) -> crate::protobuf::control::Service {
+        self.service.lock().unwrap().protobuf_descriptor(channel_id)
     }
 }
