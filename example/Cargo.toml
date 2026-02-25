@@ -8,9 +8,11 @@ anauuno= { path = ".." }
 rusb = "0.9"
 gstreamer = "0.24.4"
 gstreamer-app = "0.24.4"
-winit = "0.30"
+gstreamer-video = "0.24.4"
+winit = { version = "0.30" }
 anyhow = "1.0"
 env_logger = "0.10"
 log = "0.4"
 wgpu = "28.0"
 pollster = "0.3"
+raw-window-handle = "0.6"

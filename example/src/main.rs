@@ -4,6 +4,8 @@ use anauuno::connection::{AapConnection, ConnectionContext};
 use anauuno::stream::UsbAapStream;
 use gstreamer::prelude::*;
 use gstreamer_app::AppSrc;
+use gstreamer_video::prelude::*;
+use gstreamer_video::VideoOverlay;
 use rusb::{Context, Device, DeviceHandle, Hotplug, HotplugBuilder, UsbContext};
 use std::thread;
 use winit::application::ApplicationHandler;
@@ -47,6 +49,13 @@ pub struct State {
     is_surface_configured: bool,
     window: Arc<Window>,
     context: Arc<Mutex<ConnectionContext>>,
+    pipeline: Option<gstreamer::Pipeline>,
+    appsink: Option<gstreamer_app::AppSink>,
+    video_texture: Option<wgpu::Texture>,
+    video_bind_group: Option<wgpu::BindGroup>,
+    render_pipeline: Option<wgpu::RenderPipeline>,
+    video_width: u32,
+    video_height: u32,
 }
 
 impl State {
@@ -110,7 +119,110 @@ impl State {
             is_surface_configured: false,
             window,
             context,
+            pipeline: None,
+            appsink: None,
+            video_texture: None,
+            video_bind_group: None,
+            render_pipeline: None,
+            video_width: 0,
+            video_height: 0,
         })
+    }
+
+    pub fn set_pipeline(&mut self, pipeline: gstreamer::Pipeline) {
+        self.pipeline = Some(pipeline);
+    }
+
+    pub fn set_appsink(&mut self, appsink: gstreamer_app::AppSink) {
+        self.appsink = Some(appsink);
+        self.setup_render_pipeline();
+    }
+
+    fn setup_render_pipeline(&mut self) {
+        let shader = self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+
+        let texture_bind_group_layout = self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+            label: Some("texture_bind_group_layout"),
+        });
+
+        let render_pipeline_layout = self.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Render Pipeline Layout"),
+            bind_group_layouts: &[&texture_bind_group_layout],
+            immediate_size: 0,
+        });
+
+        let render_pipeline = self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[],
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: self.config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                polygon_mode: wgpu::PolygonMode::Fill,
+                unclipped_depth: false,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview_mask: None,
+            cache: None,
+        });
+
+        self.render_pipeline = Some(render_pipeline);
+
+        let _sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Linear,
+            ..Default::default()
+        });
+
+        // We will create the texture and bind group when we get the first frame or in resize
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
@@ -119,19 +231,131 @@ impl State {
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
             self.is_surface_configured = true;
+
+            if let Some(pipeline) = &self.pipeline {
+                if let Some(overlay) = pipeline.dynamic_cast_ref::<VideoOverlay>() {
+                    overlay.expose();
+                }
+            }
         }
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.window.request_redraw();
-
         // We can't render unless the surface is configured
         if !self.is_surface_configured {
             return Ok(());
         }
 
-        let output = self.surface.get_current_texture()?;
+        if let Some(appsink) = &self.appsink {
+            while let Some(sample) = appsink.try_pull_sample(gstreamer::ClockTime::from_mseconds(0)) {
+                let buffer = sample.buffer().unwrap();
+                let caps = sample.caps().unwrap();
+                let structure = caps.structure(0).unwrap();
+                let width = structure.get::<i32>("width").unwrap() as u32;
+                let height = structure.get::<i32>("height").unwrap() as u32;
 
+                let map = buffer.map_readable().unwrap();
+                let data = map.as_slice();
+
+                if self.video_texture.is_none() || 
+                   self.video_texture.as_ref().unwrap().width() != width || 
+                   self.video_texture.as_ref().unwrap().height() != height {
+                    
+                    self.video_width = width;
+                    self.video_height = height;
+                    
+                    let texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                        label: Some("Video Texture"),
+                        size: wgpu::Extent3d {
+                            width,
+                            height,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                        view_formats: &[],
+                    });
+
+                    let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+                    let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
+                        address_mode_u: wgpu::AddressMode::ClampToEdge,
+                        address_mode_v: wgpu::AddressMode::ClampToEdge,
+                        address_mode_w: wgpu::AddressMode::ClampToEdge,
+                        mag_filter: wgpu::FilterMode::Linear,
+                        min_filter: wgpu::FilterMode::Linear,
+                        mipmap_filter: wgpu::MipmapFilterMode::Linear,
+                        ..Default::default()
+                    });
+
+                    let texture_bind_group_layout = self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        entries: &[
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 0,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Texture {
+                                    multisampled: false,
+                                    view_dimension: wgpu::TextureViewDimension::D2,
+                                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                                },
+                                count: None,
+                            },
+                            wgpu::BindGroupLayoutEntry {
+                                binding: 1,
+                                visibility: wgpu::ShaderStages::FRAGMENT,
+                                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                                count: None,
+                            },
+                        ],
+                        label: Some("texture_bind_group_layout"),
+                    });
+
+                    let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        layout: &texture_bind_group_layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&view),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::Sampler(&sampler),
+                            },
+                        ],
+                        label: Some("video_bind_group"),
+                    });
+
+                    self.video_texture = Some(texture);
+                    self.video_bind_group = Some(bind_group);
+                }
+
+                if let Some(texture) = &self.video_texture {
+                    self.queue.write_texture(
+                        wgpu::TexelCopyTextureInfo {
+                            texture: &texture,
+                            mip_level: 0,
+                            origin: wgpu::Origin3d::ZERO,
+                            aspect: wgpu::TextureAspect::All,
+                        },
+                        data,
+                        wgpu::TexelCopyBufferLayout {
+                            offset: 0,
+                            bytes_per_row: Some(4 * width),
+                            rows_per_image: Some(height),
+                        },
+                        wgpu::Extent3d {
+                            width,
+                            height,
+                            depth_or_array_layers: 1,
+                        },
+                    );
+                }
+            }
+        }
+
+        let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -139,7 +363,7 @@ impl State {
         });
 
         {
-            let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
@@ -160,6 +384,36 @@ impl State {
                 timestamp_writes: None,
                 multiview_mask: None,
             });
+
+            if let (Some(pipeline), Some(bind_group)) = (&self.render_pipeline, &self.video_bind_group) {
+                if self.video_width > 0 && self.video_height > 0 {
+                    let window_width = self.config.width as f32;
+                    let window_height = self.config.height as f32;
+                    let video_width = self.video_width as f32;
+                    let video_height = self.video_height as f32;
+
+                    let window_aspect = window_width / window_height;
+                    let video_aspect = video_width / video_height;
+
+                    let (viewport_width, viewport_height, x, y) = if window_aspect > video_aspect {
+                        // Window is wider than video - Pillarbox
+                        let viewport_width = window_height * video_aspect;
+                        let x = (window_width - viewport_width) / 2.0;
+                        (viewport_width, window_height, x, 0.0)
+                    } else {
+                        // Window is taller than video - Letterbox
+                        let viewport_height = window_width / video_aspect;
+                        let y = (window_height - viewport_height) / 2.0;
+                        (window_width, viewport_height, 0.0, y)
+                    };
+
+                    render_pass.set_viewport(x, y, viewport_width, viewport_height, 0.0, 1.0);
+                }
+
+                render_pass.set_pipeline(pipeline);
+                render_pass.set_bind_group(0, bind_group, &[]);
+                render_pass.draw(0..3, 0..1);
+            }
         }
 
         // submit will accept anything that implements IntoIter
@@ -227,13 +481,15 @@ impl State {
 pub struct App {
     state: Option<State>,
     context: Arc<Mutex<ConnectionContext>>,
+    receiver: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
 }
 
 impl App {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(context: Arc<Mutex<ConnectionContext>>, receiver: std::sync::mpsc::Receiver<Vec<u8>>) -> Self {
         Self {
             state: None,
             context,
+            receiver: Some(receiver),
         }
     }
 }
@@ -245,7 +501,71 @@ impl ApplicationHandler<State> for App {
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
-        self.state = Some(pollster::block_on(State::new(window, Arc::clone(&self.context))).unwrap());
+        let receiver = self.receiver.take().expect("Receiver already taken");
+        let mut state = pollster::block_on(State::new(window.clone(), Arc::clone(&self.context))).unwrap();
+
+        use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle, RawWindowHandle};
+        let window_handle = window.window_handle().expect("Failed to get window handle").as_raw();
+        let _display_handle = window.display_handle().expect("Failed to get display handle").as_raw();
+
+        let _handle = match window_handle {
+            RawWindowHandle::Xlib(h) => h.window as usize,
+            RawWindowHandle::Xcb(h) => h.window.get() as usize,
+            RawWindowHandle::Wayland(h) => h.surface.as_ptr() as usize,
+            _ => 0,
+        };
+
+        // We need to start GStreamer here so we can set the window handle.
+        gstreamer::init().expect("GStreamer could not be initialized");
+
+        let pipeline = gstreamer::parse::launch(
+            "appsrc name=src is-live=true format=time ! h264parse ! decodebin ! videoconvert ! video/x-raw,format=RGBA ! appsink name=sink"
+        ).expect("Failed to create pipeline").dynamic_cast::<gstreamer::Pipeline>().unwrap();
+
+        let appsrc = pipeline
+            .clone()
+            .dynamic_cast::<gstreamer::Bin>()
+            .unwrap()
+            .by_name("src")
+            .expect("Source element not found")
+            .dynamic_cast::<AppSrc>()
+            .expect("Source element is not an AppSrc");
+
+        let appsink = pipeline
+            .clone()
+            .dynamic_cast::<gstreamer::Bin>()
+            .unwrap()
+            .by_name("sink")
+            .expect("Sink element not found")
+            .dynamic_cast::<gstreamer_app::AppSink>()
+            .expect("Sink element is not an AppSink");
+
+        state.set_pipeline(pipeline.clone());
+        state.set_appsink(appsink);
+
+        pipeline.set_state(gstreamer::State::Playing).expect("Unable to set the pipeline to the `Playing` state");
+
+        thread::spawn(move || {
+            println!("Starting stream thread...");
+
+            for data in receiver {
+                // println!("Received buffer of size: {}", data.len());
+                let mut buffer = gstreamer::Buffer::with_size(data.len()).unwrap();
+                {
+                    let buffer_ref = buffer.get_mut().unwrap();
+                    buffer_ref.copy_from_slice(0, &data).unwrap();
+                }
+
+                if let Err(err) = appsrc.push_buffer(buffer) {
+                    eprintln!("Error pushing buffer to appsrc: {}", err);
+                    break;
+                }
+            }
+
+            pipeline.set_state(gstreamer::State::Null).ok();
+        });
+
+        self.state = Some(state);
     }
 
     #[allow(unused_mut)]
@@ -292,6 +612,12 @@ impl ApplicationHandler<State> for App {
                 ..
             } => state.handle_key(event_loop, code, key_state.is_pressed()),
             _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(state) = &self.state {
+            state.window.request_redraw();
         }
     }
 }
@@ -401,15 +727,15 @@ impl Hotplug<Context> for USBHandler {
     fn device_left(&mut self, _device: Device<Context>) {}
 }
 
-fn media_data_handler(data: Data<u32>, message: Message) {
+fn media_data_handler(_data: Data<u32>, _message: Message) {
     
 }
 
 fn main() -> rusb::Result<()> {
     let context = Context::new()?;
     // Hier Vendor und Product ID des normalen Android-Geräts (OEM‑IDs) einsetzen
-    let target_vid = 0x2717; // Xiaomi
-    let target_pid = 0xff08; // PID im normalen Modus
+    let _target_vid = 0x2717; // Xiaomi
+    let _target_pid = 0xff08; // PID im normalen Modus
 
     let target_vid = 0x0e8d; // Xiaomi
     let target_pid = 0x201c; // PID im normalen Modus
@@ -442,42 +768,6 @@ fn main() -> rusb::Result<()> {
     let stream = OpenSSLTlsStream::new(stream);
     let mut connection = AapConnection::new(stream, sender, Arc::clone(&context));
 
-    thread::spawn(move || {
-        gstreamer::init().expect("GStreamer could not be initialized");
-
-        let pipeline = gstreamer::parse::launch(
-            "appsrc name=src is-live=true format=time ! h264parse ! decodebin ! autovideosink"
-        ).expect("Failed to create pipeline");
-
-        let appsrc = pipeline
-            .clone()
-            .dynamic_cast::<gstreamer::Bin>()
-            .unwrap()
-            .by_name("src")
-            .expect("Source element not found")
-            .dynamic_cast::<AppSrc>()
-            .expect("Source element is not an AppSrc");
-
-        pipeline.set_state(gstreamer::State::Playing).expect("Failed to set pipeline to Playing");
-
-        println!("Starting stream thread...");
-
-        for data in receiver {
-            let mut buffer = gstreamer::Buffer::with_size(data.len()).unwrap();
-            {
-                let buffer_ref = buffer.get_mut().unwrap();
-                buffer_ref.copy_from_slice(0, &data).unwrap();
-            }
-
-            if let Err(err) = appsrc.push_buffer(buffer) {
-                eprintln!("Error pushing buffer to appsrc: {}", err);
-                break;
-            }
-        }
-
-        pipeline.set_state(gstreamer::State::Null).ok();
-    });
-
     let mut media_service = MediaSinkService::new(MediaSinkServiceConfig {});
     media_service.add_media_data_handler(media_data_handler);
 
@@ -487,7 +777,7 @@ fn main() -> rusb::Result<()> {
 
 
     let event_loop = EventLoop::with_user_event().build().unwrap();
-    let mut app = App::new(context);
+    let mut app = App::new(context, receiver);
 
     event_loop.run_app(&mut app).unwrap();
 
