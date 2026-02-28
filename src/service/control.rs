@@ -9,19 +9,13 @@ use std::sync::{Arc, Mutex};
 
 pub struct ControlService {
     context: Arc<ConnectionContext>,
-    service_descriptors: Vec<crate::protobuf::control::Service>,
 }
 
 impl ControlService {
     pub fn new(context: Arc<ConnectionContext>) -> Self {
         Self {
             context,
-            service_descriptors: vec![],
         }
-    }
-    
-    pub fn set_service_descriptors(&mut self, service_descriptors: Vec<crate::protobuf::control::Service>) {
-        self.service_descriptors = service_descriptors;
     }
 
     fn handle_audio_focus_request_notification(&mut self, message: Message) {
@@ -65,7 +59,7 @@ impl ControlService {
             can_play_native_media_during_vr: Some(false),
             hide_projected_clock: Some(false),
             special_fields: Default::default(),
-            services: self.service_descriptors.clone(),
+            services: self.context.get_service_descriptors().lock().unwrap().clone(),
         };
 
         let mut commands = self.context.commands().lock().unwrap();

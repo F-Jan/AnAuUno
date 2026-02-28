@@ -3,7 +3,7 @@ use crate::channel::Channel;
 use crate::data::Data;
 use crate::message::{ControlMessageType, InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
-use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
+use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse, Service};
 use crate::protobuf::input;
 use crate::protobuf::input::KeyCode;
 use crate::service::control::ControlService;
@@ -36,6 +36,20 @@ impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
     }
 
     pub fn start(&mut self) {
+        let mut service_descriptors = vec![];
+        let mut counter = 0;
+        for service in &self.services {
+            if counter == 0 {
+                counter += 1;
+                continue;
+            }
+
+            service_descriptors.push(service.protobuf_descriptor(counter));
+            counter += 1;
+        }
+        self.context.set_service_descriptors(service_descriptors);
+        
+        
         // Version-Request
         self.write_message(
             Message {
@@ -87,22 +101,6 @@ impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
 
     fn start_loop(&mut self) {
         println!("Start Loop");
-
-        let mut service_descriptors = vec![];
-        let mut counter = 0;
-        for service in &self.services {
-            if counter == 0 {
-                counter += 1;
-                continue;
-            }
-
-            service_descriptors.push(service.protobuf_descriptor(counter));
-            counter += 1;
-        }
-
-        let mut control_service = ControlService::new(Arc::clone(&self.context));
-        control_service.set_service_descriptors(service_descriptors);
-        self.services[0] = Box::new(ThreadChannel::new(control_service));
 
         self.get_channel(0).unwrap().open();
 
@@ -256,6 +254,7 @@ impl Commands {
 pub struct ConnectionContext {
     app_data: BTreeMap<TypeId, Box<dyn Any + Send + Sync>>,
     commands: Mutex<Commands>,
+    service_descriptors: Mutex<Vec<crate::protobuf::control::Service>>,
 }
 
 impl ConnectionContext {
@@ -263,6 +262,7 @@ impl ConnectionContext {
         Self {
             app_data: BTreeMap::new(),
             commands: Mutex::new(Commands::new()),
+            service_descriptors: Mutex::new(vec![]),
         }
     }
 
@@ -272,5 +272,14 @@ impl ConnectionContext {
 
     pub fn commands(&self) -> &Mutex<Commands> {
         &self.commands
+    }
+    
+    pub(crate) fn set_service_descriptors(&self, descriptors: Vec<crate::protobuf::control::Service>) {
+        let mut service_descriptors = self.service_descriptors.lock().unwrap();
+        *service_descriptors = descriptors;
+    }
+    
+    pub fn get_service_descriptors(&self) -> &Mutex<Vec<Service>> {
+        &self.service_descriptors
     }
 }
