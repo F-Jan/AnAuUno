@@ -18,19 +18,19 @@ use std::sync::{Arc, Mutex};
 pub struct Connection<S: Stream, T: TlsStream<S>> {
     tls_stream: T,
     services: Vec<Box<dyn Channel>>,
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
     _phantom: PhantomData<S>,
 }
 
 impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
     pub fn new(
         stream: T,
-        context: Arc<Mutex<ConnectionContext>>,
+        context: Arc<ConnectionContext>,
     ) -> Self {
         Connection {
             tls_stream: stream,
             services: vec![],
-            context: Arc::clone(&context),
+            context,
             _phantom: PhantomData,
         }
     }
@@ -107,12 +107,10 @@ impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
         self.get_channel(0).unwrap().open();
 
         loop {
-            let context = Arc::clone(&self.context);
-            let mut context = context.lock().unwrap();
+            let mut commands = self.context.commands().lock().unwrap();
+            let messages = commands.messages_to_send();
 
-            let messages = context.commands().messages_to_send();
-
-            drop(context);
+            drop(commands);
 
             for message in messages {
                 self.write_message(message.0, message.1).unwrap();
@@ -257,14 +255,14 @@ impl Commands {
 
 pub struct ConnectionContext {
     app_data: BTreeMap<TypeId, Box<dyn Any + Send + Sync>>,
-    commands: Commands,
+    commands: Mutex<Commands>,
 }
 
 impl ConnectionContext {
     pub fn new() -> Self {
         Self {
             app_data: BTreeMap::new(),
-            commands: Commands::new(),
+            commands: Mutex::new(Commands::new()),
         }
     }
 
@@ -272,7 +270,7 @@ impl ConnectionContext {
         self.app_data.insert(TypeId::of::<T>(), Box::new(data));
     }
 
-    pub fn commands(&mut self) -> &mut Commands {
-        &mut self.commands
+    pub fn commands(&self) -> &Mutex<Commands> {
+        &self.commands
     }
 }

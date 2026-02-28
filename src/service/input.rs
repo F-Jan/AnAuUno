@@ -9,11 +9,11 @@ use crate::connection::ConnectionContext;
 use crate::protobuf::control::service::InputSourceService;
 
 pub struct InputService {
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
 }
 
 impl InputService {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(context: Arc<ConnectionContext>) -> Self {
         Self {
             context,
         }
@@ -25,10 +25,8 @@ impl InputService {
         let mut config = input::BindingResponse::new();
         config.set_status(MessageStatus::Ok);
 
-        let context = Arc::clone(&self.context);
-        let mut context = context.lock().unwrap();
-
-        context.commands().send_message(Message::new_with_protobuf_message(
+        let mut commands = self.context.commands().lock().unwrap();
+        commands.send_message(Message::new_with_protobuf_message(
             message.channel,
             message.is_control,
             config,

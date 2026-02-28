@@ -15,11 +15,11 @@ pub struct VideoService {
     session_id: Option<i32>,
     pub buffer_sender: Sender<Vec<u8>>,
     pub infos: Vec<u8>,
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
 }
 
 impl VideoService {
-    pub fn new(buffer_sender: Sender<Vec<u8>>, context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(buffer_sender: Sender<Vec<u8>>, context: Arc<ConnectionContext>) -> Self {
         Self {
             session_id: None,
             buffer_sender,
@@ -40,10 +40,8 @@ impl VideoService {
             config.set_max_unacked(1);
             config.configuration_indices.push(0u32);
 
-            let context = Arc::clone(&self.context);
-            let mut context = context.lock().unwrap();
-
-            context.commands().send_message(Message::new_with_protobuf_message(
+            let mut commands = self.context.commands().lock().unwrap();
+            commands.send_message(Message::new_with_protobuf_message(
                 message.channel,
                 false,
                 config,
@@ -56,7 +54,7 @@ impl VideoService {
             notification.set_mode(VideoFocusMode::Focused);
             notification.set_unsolicited(false);
 
-            context.commands().send_message(Message::new_with_protobuf_message(
+            commands.send_message(Message::new_with_protobuf_message(
                 message.channel,
                 false,
                 notification,
@@ -74,10 +72,8 @@ impl VideoService {
         config.set_mode(VideoFocusMode::Focused);
         config.set_unsolicited(false);
 
-        let context = Arc::clone(&self.context);
-        let mut context = context.lock().unwrap();
-        
-        context.commands().send_message(Message::new_with_protobuf_message(
+        let mut commands = self.context.commands().lock().unwrap();
+        commands.send_message(Message::new_with_protobuf_message(
             message.channel,
             false,
             config,
@@ -114,10 +110,8 @@ impl VideoService {
             ack.set_session_id(self.session_id.unwrap());
             ack.set_ack(1);
 
-            let context = Arc::clone(&self.context);
-            let mut context = context.lock().unwrap();
-            
-            context.commands().send_message(Message::new_with_protobuf_message(
+            let mut commands = self.context.commands().lock().unwrap();
+            commands.send_message(Message::new_with_protobuf_message(
                 2,
                 false,
                 ack,

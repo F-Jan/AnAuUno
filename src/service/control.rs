@@ -8,12 +8,12 @@ use protobuf::{Enum, Message as ProtoMessage};
 use std::sync::{Arc, Mutex};
 
 pub struct ControlService {
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
     service_descriptors: Vec<crate::protobuf::control::Service>,
 }
 
 impl ControlService {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(context: Arc<ConnectionContext>) -> Self {
         Self {
             context,
             service_descriptors: vec![],
@@ -42,10 +42,8 @@ impl ControlService {
         let mut notification = AudioFocusNotification::new();
         notification.set_focus_state(audio_focus_state_type);
 
-        let context = Arc::clone(&self.context);
-        let mut context = context.lock().unwrap();
-
-        context.commands().send_message(Message::new_with_protobuf_message(
+        let mut commands = self.context.commands().lock().unwrap();
+        commands.send_message(Message::new_with_protobuf_message(
             0,
             false,
             notification,
@@ -70,10 +68,8 @@ impl ControlService {
             services: self.service_descriptors.clone(),
         };
 
-        let context = Arc::clone(&self.context);
-        let mut context = context.lock().unwrap();
-
-        context.commands().send_message(Message::new_with_protobuf_message(
+        let mut commands = self.context.commands().lock().unwrap();
+        commands.send_message(Message::new_with_protobuf_message(
             0,
             false,
             res,

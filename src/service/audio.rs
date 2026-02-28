@@ -9,11 +9,11 @@ use crate::protobuf::media::{AudioConfiguration, AudioStreamType, MediaCodecType
 use crate::service::Service;
 
 pub struct AudioService {
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
 }
 
 impl AudioService {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(context: Arc<ConnectionContext>) -> Self {
         Self {
             context,
         }
@@ -29,10 +29,8 @@ impl AudioService {
             config.set_max_unacked(1);
             config.configuration_indices.push(0u32);
 
-            let context = Arc::clone(&self.context);
-            let mut context = context.lock().unwrap();
-
-            context.commands().send_message(Message::new_with_protobuf_message(
+            let mut commands = self.context.commands().lock().unwrap();
+            commands.send_message(Message::new_with_protobuf_message(
                 message.channel,
                 false,
                 config,

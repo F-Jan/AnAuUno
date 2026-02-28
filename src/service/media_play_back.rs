@@ -7,11 +7,11 @@ use std::sync::{Arc, Mutex};
 use crate::protobuf::control::service::MediaPlaybackStatusService;
 
 pub struct MediaPlayBackService {
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
 }
 
 impl MediaPlayBackService {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(context: Arc<ConnectionContext>) -> Self {
         Self {
             context,
         }

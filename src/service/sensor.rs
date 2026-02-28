@@ -11,11 +11,11 @@ use crate::protobuf::control::service::sensor_source_service::Sensor;
 use crate::protobuf::control::service::SensorSourceService;
 
 pub struct SensorService {
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
 }
 
 impl SensorService {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(context: Arc<ConnectionContext>) -> Self {
         Self {
             context,
         }
@@ -29,10 +29,8 @@ impl SensorService {
         let mut config = sensors::SensorResponse::new();
         config.set_status(MessageStatus::Ok);
 
-        let context = Arc::clone(&self.context);
-        let mut context = context.lock().unwrap();
-
-        context.commands().send_message(Message::new_with_protobuf_message(
+        let mut commands = self.context.commands().lock().unwrap();
+        commands.send_message(Message::new_with_protobuf_message(
             message.channel,
             false,
             config,
@@ -45,7 +43,7 @@ impl SensorService {
         driving_status_data.set_status(driving_status_data::Status::Unrestricted as i32);
         config.driving_status.push(driving_status_data);
 
-        context.commands().send_message(Message::new_with_protobuf_message(
+        commands.send_message(Message::new_with_protobuf_message(
             message.channel,
             false,
             config,

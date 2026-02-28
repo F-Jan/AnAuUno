@@ -6,11 +6,11 @@ use crate::protobuf::media::{AudioConfiguration, MediaCodecType};
 use crate::service::Service;
 
 pub struct MicrophoneService {
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
 }
 
 impl MicrophoneService {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>) -> Self {
+    pub fn new(context: Arc<ConnectionContext>) -> Self {
         Self {
             context,
         }

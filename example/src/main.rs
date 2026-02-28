@@ -56,7 +56,7 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     window: Arc<Window>,
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
     pipeline: Option<gstreamer::Pipeline>,
     appsink: Option<gstreamer_app::AppSink>,
     video_texture: Option<wgpu::Texture>,
@@ -69,7 +69,7 @@ pub struct State {
 impl State {
     // We don't need this to be async right now,
     // but we will in the next tutorial
-    pub async fn new(window: Arc<Window>, context: Arc<Mutex<ConnectionContext>>) -> anyhow::Result<Self> {
+    pub async fn new(window: Arc<Window>, context: Arc<ConnectionContext>) -> anyhow::Result<Self> {
         let size = window.inner_size();
 
         // The instance is a handle to our GPU
@@ -265,13 +265,13 @@ impl State {
                 let map = buffer.map_readable().unwrap();
                 let data = map.as_slice();
 
-                if self.video_texture.is_none() || 
-                   self.video_texture.as_ref().unwrap().width() != width || 
+                if self.video_texture.is_none() ||
+                   self.video_texture.as_ref().unwrap().width() != width ||
                    self.video_texture.as_ref().unwrap().height() != height {
-                    
+
                     self.video_width = width;
                     self.video_height = height;
-                    
+
                     let texture = self.device.create_texture(&wgpu::TextureDescriptor {
                         label: Some("Video Texture"),
                         size: wgpu::Extent3d {
@@ -445,20 +445,16 @@ impl State {
 
             KeyCode::Digit1 => {
                 if is_pressed {
-                    let context = Arc::clone(&self.context);
-                    let mut context = context.lock().unwrap();
-
-                    context.commands().send_rotary_event(-1);
+                    let mut commands = self.context.commands().lock().unwrap();
+                    commands.send_rotary_event(-1);
                 }
 
                 0
             },
             KeyCode::Digit2 => {
                 if is_pressed {
-                    let context = Arc::clone(&self.context);
-                    let mut context = context.lock().unwrap();
-
-                    context.commands().send_rotary_event(1);
+                    let mut commands = self.context.commands().lock().unwrap();
+                    commands.send_rotary_event(1);
                 }
 
                 0
@@ -469,10 +465,8 @@ impl State {
         if key_code_id != 0 {
             //println!("Key {:?} pressed: {}", code, is_pressed);
 
-            let context = Arc::clone(&self.context);
-            let mut context = context.lock().unwrap();
-
-            context.commands().send_key_event(key_code_id, is_pressed);
+            let mut commands = self.context.commands().lock().unwrap();
+            commands.send_key_event(key_code_id, is_pressed);
         }
 
         match (code, is_pressed) {
@@ -488,12 +482,12 @@ impl State {
 
 pub struct App {
     state: Option<State>,
-    context: Arc<Mutex<ConnectionContext>>,
+    context: Arc<ConnectionContext>,
     receiver: Option<std::sync::mpsc::Receiver<Vec<u8>>>,
 }
 
 impl App {
-    pub fn new(context: Arc<Mutex<ConnectionContext>>, receiver: std::sync::mpsc::Receiver<Vec<u8>>) -> Self {
+    pub fn new(context: Arc<ConnectionContext>, receiver: std::sync::mpsc::Receiver<Vec<u8>>) -> Self {
         Self {
             state: None,
             context,
@@ -736,7 +730,7 @@ impl Hotplug<Context> for USBHandler {
 }
 
 fn media_data_handler(_data: Data<u32>, _message: Message) {
-    
+
 }
 
 fn main() -> rusb::Result<()> {
@@ -770,7 +764,7 @@ fn main() -> rusb::Result<()> {
 
     let (sender, receiver) = std::sync::mpsc::channel();
     //let (key_event_sender, key_event_receiver) = std::sync::mpsc::channel::<(u32, bool)>();
-    let context = Arc::new(Mutex::new(ConnectionContext::new()));
+    let context = Arc::new(ConnectionContext::new());
 
     let stream = RUSBStream::new(handle, 0x81, 0x01);
     let stream = OpenSSLTlsStream::new(stream);
