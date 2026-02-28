@@ -1,7 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use anauuno::connection::{Connection, ConnectionContext};
-use anauuno::stream::UsbAapStream;
 use gstreamer::prelude::*;
 use gstreamer_app::AppSrc;
 use gstreamer_video::prelude::*;
@@ -16,6 +15,7 @@ use winit::window::{Window};
 use anauuno::data::Data;
 use anauuno::message::Message;
 use anauuno::service::{MediaSinkService, MediaSinkServiceConfig};
+use anauuno::stream::rusb::RUSBStream;
 use anauuno::tls::openssl::OpenSSLTlsStream;
 
 // AOA‑Setup‑Requests
@@ -764,7 +764,7 @@ fn main() -> rusb::Result<()> {
     //let (key_event_sender, key_event_receiver) = std::sync::mpsc::channel::<(u32, bool)>();
     let context = Arc::new(Mutex::new(ConnectionContext::new()));
 
-    let stream = UsbAapStream::new(handle, 0x81, 0x01);
+    let stream = RUSBStream::new(handle, 0x81, 0x01);
     let stream = OpenSSLTlsStream::new(stream);
     let mut connection = Connection::new(stream, sender, Arc::clone(&context));
 

@@ -1,20 +1,10 @@
-use crate::message::Message;
-use rusb::{Context, DeviceHandle, Error};
 use std::collections::VecDeque;
 use std::io::{Read, Write};
+use rusb::{Context, DeviceHandle, Error};
+use crate::message::Message;
+use crate::stream::Stream;
 
-pub trait Stream: Read + Write {
-    fn finish_handshake(&mut self);
-
-    fn read_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<usize>;
-    fn write_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<()>;
-
-    fn extract_write_buffer(&mut self) -> Vec<u8>;
-}
-
-
-
-pub struct UsbAapStream {
+pub struct RUSBStream {
     handshake_done: bool,
     device_handle: DeviceHandle<Context>,
     raw_buffer_in: VecDeque<u8>,
@@ -24,9 +14,9 @@ pub struct UsbAapStream {
     endpoint_out: u8,
 }
 
-impl UsbAapStream {
+impl RUSBStream {
     pub fn new(device_handle: DeviceHandle<Context>,  endpoint_in: u8, endpoint_out: u8) -> Self {
-        UsbAapStream {
+        RUSBStream {
             handshake_done: false,
             device_handle,
             raw_buffer_in: VecDeque::new(),
@@ -68,7 +58,7 @@ impl UsbAapStream {
     }
 }
 
-impl Read for UsbAapStream {
+impl Read for RUSBStream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut bytes_read = 0;
 
@@ -110,7 +100,7 @@ impl Read for UsbAapStream {
     }
 }
 
-impl Write for UsbAapStream {
+impl Write for RUSBStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.write_buffer.extend_from_slice(buf);
 
@@ -138,12 +128,12 @@ impl Write for UsbAapStream {
     }
 }
 
-impl Stream for UsbAapStream {
+impl Stream for RUSBStream {
     fn finish_handshake(&mut self) {
         self.handshake_done = true;
     }
 
-    fn read_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<usize> { 
+    fn read_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<usize> {
         self.fill_in_buffer(buf.len());
 
         if self.raw_buffer_in.len() == 0 {
