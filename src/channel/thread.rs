@@ -27,7 +27,7 @@ impl<S: Service + Send> ThreadChannel<S> {
 
 impl<S: Service + Send + 'static> Channel for ThreadChannel<S> {
 
-    fn send_message_to_channel(&self, message: Message) {
+    fn send_message_to_channel(&mut self, message: Message) {
         self.message_in_sender.send(message).unwrap();
     }
 

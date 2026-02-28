@@ -13,29 +13,29 @@ use crate::service::media_play_back::MediaPlayBackService;
 use crate::service::microphone::MicrophoneService;
 use crate::service::sensor::SensorService;
 use crate::service::video::VideoService;
-use crate::stream::AapSteam;
+use crate::stream::Stream;
 use crate::tls::TlsStream;
-use core::marker::PhantomData;
 use core::any::{Any, TypeId};
+use core::marker::PhantomData;
 use protobuf::Message as ProtobufMessage;
 use std::collections::BTreeMap;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
-pub struct AapConnection<S: AapSteam, T: TlsStream<S>> {
+pub struct Connection<S: Stream, T: TlsStream<S>> {
     tls_stream: T,
     services: Vec<Box<dyn Channel>>,
     context: Arc<Mutex<ConnectionContext>>,
     _phantom: PhantomData<S>,
 }
 
-impl<S: AapSteam, T: TlsStream<S>> AapConnection<S, T> {
+impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
     pub fn new(
         stream: T,
         buffer_sender: Sender<Vec<u8>>,
         context: Arc<Mutex<ConnectionContext>>,
     ) -> Self {
-        AapConnection {
+        Connection {
             tls_stream: stream,
             services: vec![],
             context: Arc::clone(&context),

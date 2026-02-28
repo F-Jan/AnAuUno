@@ -1,4 +1,4 @@
-use crate::stream::AapSteam;
+use crate::stream::Stream;
 use crate::tls::TlsStream;
 use openssl::pkey::PKey;
 use openssl::ssl::{Ssl, SslConnector, SslMethod, SslStream, SslVerifyMode};
@@ -7,11 +7,11 @@ use std::io::{Read, Write};
 
 use crate::tls::certs::{CERT_PEM_STR, KEY_PEM_STR};
 
-pub struct OpenSSLTlsStream<S: AapSteam> {
+pub struct OpenSSLTlsStream<S: Stream> {
     stream: SslStream<S>,
 }
 
-impl<S: AapSteam> OpenSSLTlsStream<S> {
+impl<S: Stream> OpenSSLTlsStream<S> {
     pub fn new(stream: S) -> Self {
         let mut builder = SslConnector::builder(SslMethod::tls()).unwrap();
         builder.set_verify(SslVerifyMode::NONE); // In Produktion: VERIFY_PEER
@@ -36,7 +36,7 @@ impl<S: AapSteam> OpenSSLTlsStream<S> {
     }
 }
 
-impl<S: AapSteam> TlsStream<S> for OpenSSLTlsStream<S> {
+impl<S: Stream> TlsStream<S> for OpenSSLTlsStream<S> {
     fn do_handshake(&mut self) -> crate::error::Result<()> {
         self.stream.do_handshake().unwrap();
         

@@ -1,9 +1,9 @@
-use crate::stream::AapSteam;
+use crate::stream::Stream;
 
 pub mod openssl;
 pub mod certs;
 
-pub trait TlsStream<S: AapSteam>{
+pub trait TlsStream<S: Stream>{
     fn do_handshake(&mut self) -> crate::error::Result<()>;
 
     fn get_mut(&mut self) -> &mut S;

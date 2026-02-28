@@ -21,7 +21,6 @@ impl InputService {
 
     fn handle_binding_request(&mut self, message: Message) {
         let data = KeyBindingRequest::parse_from_bytes(message.data.as_slice()).unwrap();
-        println!("BindingRequest(Channel {} {}): {:#?}", message.channel, message.is_control, data);
 
         let mut config = input::BindingResponse::new();
         config.set_status(MessageStatus::Ok);

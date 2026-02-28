@@ -70,8 +70,6 @@ impl ControlService {
             services: self.service_descriptors.clone(),
         };
 
-        println!("{:#?}", res);
-
         let context = Arc::clone(&self.context);
         let mut context = context.lock().unwrap();
 

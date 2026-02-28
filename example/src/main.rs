@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
-use anauuno::connection::{AapConnection, ConnectionContext};
+use anauuno::connection::{Connection, ConnectionContext};
 use anauuno::stream::UsbAapStream;
 use gstreamer::prelude::*;
 use gstreamer_app::AppSrc;
@@ -766,7 +766,7 @@ fn main() -> rusb::Result<()> {
 
     let stream = UsbAapStream::new(handle, 0x81, 0x01);
     let stream = OpenSSLTlsStream::new(stream);
-    let mut connection = AapConnection::new(stream, sender, Arc::clone(&context));
+    let mut connection = Connection::new(stream, sender, Arc::clone(&context));
 
     let mut media_service = MediaSinkService::new(MediaSinkServiceConfig {});
     media_service.add_media_data_handler(media_data_handler);

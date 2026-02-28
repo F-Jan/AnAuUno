@@ -3,7 +3,7 @@ use rusb::{Context, DeviceHandle, Error};
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 
-pub trait AapSteam: Read + Write {
+pub trait Stream: Read + Write {
     fn finish_handshake(&mut self);
 
     fn read_raw(&mut self, buf: &mut [u8]) -> crate::error::Result<usize>;
@@ -138,7 +138,7 @@ impl Write for UsbAapStream {
     }
 }
 
-impl AapSteam for UsbAapStream {
+impl Stream for UsbAapStream {
     fn finish_handshake(&mut self) {
         self.handshake_done = true;
     }
