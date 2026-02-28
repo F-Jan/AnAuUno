@@ -72,3 +72,12 @@ impl Service for MediaSinkService {
         todo!()
     }
 }
+
+pub enum ServiceType {
+    Control,
+    Media,
+    Input,
+    Navigation,
+    MediaPlayback,
+    Sensors,
+}

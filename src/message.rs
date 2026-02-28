@@ -1,4 +1,5 @@
 use crate::frame::{FrameHeader, FrameType};
+use crate::service::ServiceType;
 use crate::stream::Stream;
 use crate::tls::TlsStream;
 
@@ -330,18 +331,28 @@ pub enum NavigationMessageType {
     NextTurnDistanceAndTime = 0x8005,
 }
 
-pub enum PlaybackMessageType {
+impl NavigationMessageType {
+    pub fn from_u16(value: u16) -> Option<Self> {
+        match value {
+             0x8004 => Some(NavigationMessageType::NextTurnDetails),
+             0x8005 => Some(NavigationMessageType::NextTurnDistanceAndTime),
+            _ => None,
+        }
+    }
+}
+
+pub enum MediaPlaybackMessageType {
     PlaybackMetadata = 0x8001,
     PlaybackStartResponse = 0x8002,
     PlaybackMetaDataStart = 0x8003,
 }
 
-impl PlaybackMessageType {
+impl MediaPlaybackMessageType {
     pub fn from_u16(value: u16) -> Option<Self> {
         match value {
-            0x8001 => Some(PlaybackMessageType::PlaybackMetadata),
-            0x8002 => Some(PlaybackMessageType::PlaybackStartResponse),
-            0x8003 => Some(PlaybackMessageType::PlaybackMetaDataStart),
+            0x8001 => Some(MediaPlaybackMessageType::PlaybackMetadata),
+            0x8002 => Some(MediaPlaybackMessageType::PlaybackStartResponse),
+            0x8003 => Some(MediaPlaybackMessageType::PlaybackMetaDataStart),
             _ => None,
         }
     }
@@ -360,6 +371,66 @@ impl SensorsMessageType {
              0x8002 => Some(SensorsMessageType::StartResponse),
              0x8003 => Some(SensorsMessageType::Event),
             _ => None,
+        }
+    }
+}
+
+
+pub struct UnitedMessageType {
+    pub service_type: ServiceType,
+    pub message_type: u16,
+}
+
+impl From<ControlMessageType> for UnitedMessageType {
+    fn from(value: ControlMessageType) -> Self {
+        UnitedMessageType {
+            service_type: ServiceType::Control,
+            message_type: value as u16,
+        }
+    }
+}
+
+impl From<MediaMessageType> for UnitedMessageType {
+    fn from(value: MediaMessageType) -> Self {
+        UnitedMessageType {
+            service_type: ServiceType::Media,
+            message_type: value as u16,
+        }
+    }
+}
+
+impl From<InputMessageType> for UnitedMessageType {
+    fn from(value: InputMessageType) -> Self {
+        UnitedMessageType {
+            service_type: ServiceType::Input,
+            message_type: value as u16,
+        }
+    }
+}
+
+impl From<NavigationMessageType> for UnitedMessageType {
+    fn from(value: NavigationMessageType) -> Self {
+        UnitedMessageType {
+            service_type: ServiceType::Navigation,
+            message_type: value as u16,
+        }
+    }
+}
+
+impl From<MediaPlaybackMessageType> for UnitedMessageType {
+    fn from(value: MediaPlaybackMessageType) -> Self {
+        UnitedMessageType {
+            service_type: ServiceType::MediaPlayback,
+            message_type: value as u16,
+        }
+    }
+}
+
+impl From<SensorsMessageType> for UnitedMessageType {
+    fn from(value: SensorsMessageType) -> Self {
+        UnitedMessageType {
+            service_type: ServiceType::Sensors,
+            message_type: value as u16,
         }
     }
 }
