@@ -6,20 +6,13 @@ use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse};
 use crate::protobuf::input;
 use crate::protobuf::input::KeyCode;
-use crate::service::audio::AudioService;
 use crate::service::control::ControlService;
-use crate::service::input::InputService;
-use crate::service::media_play_back::MediaPlayBackService;
-use crate::service::microphone::MicrophoneService;
-use crate::service::sensor::SensorService;
-use crate::service::video::VideoService;
 use crate::stream::Stream;
 use crate::tls::TlsStream;
 use core::any::{Any, TypeId};
 use core::marker::PhantomData;
 use protobuf::Message as ProtobufMessage;
 use std::collections::BTreeMap;
-use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 pub struct Connection<S: Stream, T: TlsStream<S>> {
@@ -32,7 +25,6 @@ pub struct Connection<S: Stream, T: TlsStream<S>> {
 impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
     pub fn new(
         stream: T,
-        buffer_sender: Sender<Vec<u8>>,
         context: Arc<Mutex<ConnectionContext>>,
     ) -> Self {
         Connection {
@@ -41,15 +33,6 @@ impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
             context: Arc::clone(&context),
             _phantom: PhantomData,
         }
-        .add_service(ThreadChannel::new(ControlService::new(Arc::clone(&context))))
-        .add_service(ThreadChannel::new(SensorService::new(Arc::clone(&context))))
-        .add_service(ThreadChannel::new(VideoService::new(buffer_sender, Arc::clone(&context))))
-        .add_service(ThreadChannel::new(InputService::new(Arc::clone(&context))))
-        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
-        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
-        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
-        .add_service(ThreadChannel::new(MicrophoneService::new(Arc::clone(&context))))
-        .add_service(ThreadChannel::new(MediaPlayBackService::new(Arc::clone(&context))))
     }
 
     pub fn start(&mut self) {

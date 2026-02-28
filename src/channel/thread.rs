@@ -14,7 +14,7 @@ pub struct ThreadChannel<S: Service + Send> {
 }
 
 impl<S: Service + Send> ThreadChannel<S> {
-    pub(crate) fn new(service: S) -> Self {
+    pub fn new(service: S) -> Self {
         let (message_in_sender, message_in_receiver) = mpsc::channel::<Message>();
 
         Self {

@@ -12,9 +12,17 @@ use winit::event::{KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window};
+use anauuno::channel::thread::ThreadChannel;
 use anauuno::data::Data;
 use anauuno::message::Message;
 use anauuno::service::{MediaSinkService, MediaSinkServiceConfig};
+use anauuno::service::audio::AudioService;
+use anauuno::service::control::ControlService;
+use anauuno::service::input::InputService;
+use anauuno::service::media_play_back::MediaPlayBackService;
+use anauuno::service::microphone::MicrophoneService;
+use anauuno::service::sensor::SensorService;
+use anauuno::service::video::VideoService;
 use anauuno::stream::rusb::RUSBStream;
 use anauuno::tls::openssl::OpenSSLTlsStream;
 
@@ -766,7 +774,16 @@ fn main() -> rusb::Result<()> {
 
     let stream = RUSBStream::new(handle, 0x81, 0x01);
     let stream = OpenSSLTlsStream::new(stream);
-    let mut connection = Connection::new(stream, sender, Arc::clone(&context));
+    let mut connection = Connection::new(stream, Arc::clone(&context))
+        .add_service(ThreadChannel::new(ControlService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(SensorService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(VideoService::new(sender, Arc::clone(&context))))
+        .add_service(ThreadChannel::new(InputService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(AudioService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(MicrophoneService::new(Arc::clone(&context))))
+        .add_service(ThreadChannel::new(MediaPlayBackService::new(Arc::clone(&context))));
 
     let mut media_service = MediaSinkService::new(MediaSinkServiceConfig {});
     media_service.add_media_data_handler(media_data_handler);
