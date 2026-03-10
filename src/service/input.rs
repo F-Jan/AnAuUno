@@ -1,12 +1,12 @@
-use std::sync::{Arc, Mutex};
+use crate::connection::ConnectionContext;
 use crate::message::{InputMessageType, Message};
 use crate::protobuf::common::MessageStatus;
+use crate::protobuf::control::service::InputSourceService;
 use crate::protobuf::input;
 use crate::protobuf::input::{KeyBindingRequest, KeyCode};
 use crate::service::Service;
 use protobuf::Message as ProtoMessage;
-use crate::connection::ConnectionContext;
-use crate::protobuf::control::service::InputSourceService;
+use std::sync::Arc;
 
 pub struct InputService {
     context: Arc<ConnectionContext>,

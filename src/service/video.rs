@@ -1,6 +1,3 @@
-use std::sync::{Arc, Mutex};
-use std::sync::mpsc::Sender;
-use protobuf::Message as ProtoMessage;
 use crate::connection::ConnectionContext;
 use crate::message::{MediaMessageType, Message};
 use crate::protobuf::control::service::media_sink_service::video_configuration::{VideoCodecResolutionType, VideoFrameRateType};
@@ -10,6 +7,9 @@ use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
 use crate::protobuf::media::{AudioStreamType, MediaCodecType, MediaSetupRequest, VideoFocusMode, VideoFocusRequestNotification};
 use crate::service::Service;
+use protobuf::Message as ProtoMessage;
+use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
 pub struct VideoService {
     session_id: Option<i32>,
@@ -40,6 +40,10 @@ impl VideoService {
             config.set_max_unacked(1);
             config.configuration_indices.push(0u32);
 
+            let mut notification = media::VideoFocusNotification::new();
+            notification.set_mode(VideoFocusMode::Focused);
+            notification.set_unsolicited(false);
+
             let mut commands = self.context.commands().lock().unwrap();
             commands.send_message(Message::new_with_protobuf_message(
                 message.channel,
@@ -47,12 +51,6 @@ impl VideoService {
                 config,
                 MediaMessageType::ConfigResponse as u16
             ), true);
-
-
-
-            let mut notification = media::VideoFocusNotification::new();
-            notification.set_mode(VideoFocusMode::Focused);
-            notification.set_unsolicited(false);
 
             commands.send_message(Message::new_with_protobuf_message(
                 message.channel,

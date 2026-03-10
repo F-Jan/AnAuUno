@@ -7,7 +7,7 @@ pub struct BlockingCannel<S: Service + Send> {
 }
 
 impl<S: Service + Send> BlockingCannel<S> {
-    pub(crate) fn new(service: S) -> Self {
+    pub fn new(service: S) -> Self {
         Self {
             service,
         }

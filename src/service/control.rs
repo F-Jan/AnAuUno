@@ -5,7 +5,7 @@ use crate::protobuf::control::audio_focus_request_notification::AudioFocusReques
 use crate::protobuf::control::{AudioFocusNotification, AudioFocusRequestNotification, ServiceDiscoveryResponse};
 use crate::service::Service;
 use protobuf::{Enum, Message as ProtoMessage};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct ControlService {
     context: Arc<ConnectionContext>,

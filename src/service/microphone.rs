@@ -1,9 +1,9 @@
-use std::sync::{Arc, Mutex};
 use crate::connection::ConnectionContext;
 use crate::message::Message;
 use crate::protobuf::control::service::MediaSourceService;
 use crate::protobuf::media::{AudioConfiguration, MediaCodecType};
 use crate::service::Service;
+use std::sync::Arc;
 
 pub struct MicrophoneService {
     context: Arc<ConnectionContext>,

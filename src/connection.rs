@@ -1,4 +1,3 @@
-use crate::channel::thread::ThreadChannel;
 use crate::channel::Channel;
 use crate::data::Data;
 use crate::message::{ControlMessageType, InputMessageType, Message};
@@ -6,7 +5,6 @@ use crate::protobuf::common::MessageStatus;
 use crate::protobuf::control::{ChannelOpenRequest, ChannelOpenResponse, Service};
 use crate::protobuf::input;
 use crate::protobuf::input::KeyCode;
-use crate::service::control::ControlService;
 use crate::stream::Stream;
 use crate::tls::TlsStream;
 use core::any::{Any, TypeId};
@@ -48,8 +46,8 @@ impl<S: Stream, T: TlsStream<S>> Connection<S, T> {
             counter += 1;
         }
         self.context.set_service_descriptors(service_descriptors);
-        
-        
+
+
         // Version-Request
         self.write_message(
             Message {
@@ -273,12 +271,12 @@ impl ConnectionContext {
     pub fn commands(&self) -> &Mutex<Commands> {
         &self.commands
     }
-    
+
     pub(crate) fn set_service_descriptors(&self, descriptors: Vec<crate::protobuf::control::Service>) {
         let mut service_descriptors = self.service_descriptors.lock().unwrap();
         *service_descriptors = descriptors;
     }
-    
+
     pub fn get_service_descriptors(&self) -> &Mutex<Vec<Service>> {
         &self.service_descriptors
     }

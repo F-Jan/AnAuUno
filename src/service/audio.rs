@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-use protobuf::Message as ProtoMessage;
 use crate::connection::ConnectionContext;
 use crate::message::{MediaMessageType, Message};
 use crate::protobuf::control::service::MediaSinkService;
@@ -7,6 +5,8 @@ use crate::protobuf::media;
 use crate::protobuf::media::config::ConfigStatus;
 use crate::protobuf::media::{AudioConfiguration, AudioStreamType, MediaCodecType, MediaSetupRequest};
 use crate::service::Service;
+use protobuf::Message as ProtoMessage;
+use std::sync::Arc;
 
 pub struct AudioService {
     context: Arc<ConnectionContext>,

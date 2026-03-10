@@ -1,10 +1,10 @@
 use crate::connection::ConnectionContext;
 use crate::message::Message;
+use crate::protobuf::control::service::MediaPlaybackStatusService;
 use crate::protobuf::playback;
 use crate::service::Service;
 use protobuf::Message as ProtoMessage;
-use std::sync::{Arc, Mutex};
-use crate::protobuf::control::service::MediaPlaybackStatusService;
+use std::sync::Arc;
 
 pub struct MediaPlayBackService {
     context: Arc<ConnectionContext>,

@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
+use crate::connection::ConnectionContext;
 use crate::message::{Message, SensorsMessageType};
 use crate::protobuf::common::MessageStatus;
-use crate::protobuf::sensors::sensor_batch::{driving_status_data, DrivingStatusData};
-use crate::protobuf::sensors::{SensorRequest, SensorType};
-use crate::protobuf::sensors;
-use crate::service::Service;
-use protobuf::Message as ProtoMessage;
-use crate::connection::ConnectionContext;
 use crate::protobuf::control::service::sensor_source_service::Sensor;
 use crate::protobuf::control::service::SensorSourceService;
+use crate::protobuf::sensors;
+use crate::protobuf::sensors::sensor_batch::{driving_status_data, DrivingStatusData};
+use crate::protobuf::sensors::{SensorRequest, SensorType};
+use crate::service::Service;
+use protobuf::Message as ProtoMessage;
+use std::sync::Arc;
 
 pub struct SensorService {
     context: Arc<ConnectionContext>,
