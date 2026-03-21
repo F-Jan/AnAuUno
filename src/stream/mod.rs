@@ -1,4 +1,5 @@
 pub mod rusb;
+pub mod tcp;
 
 use std::io::{Read, Write};
 

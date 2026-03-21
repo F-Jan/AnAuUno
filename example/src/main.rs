@@ -1,3 +1,4 @@
+use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use anauuno::connection::{Connection, ConnectionContext};
@@ -24,6 +25,7 @@ use anauuno::service::microphone::MicrophoneService;
 use anauuno::service::sensor::SensorService;
 use anauuno::service::video::VideoService;
 use anauuno::stream::rusb::RUSBStream;
+use anauuno::stream::tcp::TcpStream;
 use anauuno::tls::openssl::OpenSSLTlsStream;
 
 // AOA‑Setup‑Requests
@@ -746,7 +748,7 @@ fn main() -> rusb::Result<()> {
     let target_vid2 = 0x18d1; // Google
     let target_pid2 = 0x2d01; // AOA Modus
 
-    let (sender, receiver) = std::sync::mpsc::channel::<DeviceHandle<Context>>();
+    /*let (sender, receiver) = std::sync::mpsc::channel::<DeviceHandle<Context>>();
     let usb_handler = USBHandler { device_vid: target_vid, device_pid: target_pid, aoa_vid: target_vid2, aoa_pid: target_pid2, sender: Arc::new(sender) };
 
     let _registration = HotplugBuilder::new()
@@ -759,14 +761,21 @@ fn main() -> rusb::Result<()> {
         }
     });
 
+    let handle = receiver.recv().unwrap();*/
 
-    let handle = receiver.recv().unwrap();
+
+    println!("Waiting for TCP Connection...");
+    let listener = TcpListener::bind("0.0.0.0:5288").unwrap();
+    let (stream, _) = listener.accept().unwrap();
+    println!("TCP Connection established.");
+
 
     let (sender, receiver) = std::sync::mpsc::channel();
     //let (key_event_sender, key_event_receiver) = std::sync::mpsc::channel::<(u32, bool)>();
     let context = Arc::new(ConnectionContext::new());
 
-    let stream = RUSBStream::new(handle, 0x81, 0x01);
+    //let stream = RUSBStream::new(handle, 0x81, 0x01);
+    let stream = anauuno::stream::tcp::TcpStream::new(stream);
     let stream = OpenSSLTlsStream::new(stream);
     let mut connection = Connection::new(stream, Arc::clone(&context))
         .add_service(ThreadChannel::new(ControlService::new(Arc::clone(&context))))
